@@ -53,11 +53,23 @@ CREATE TABLE kosztorysy (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Przykładowe dane testowe
-INSERT INTO klienci (imie, nazwisko, nr_telefonu, nip, nazwa_firmy) VALUES
-('Jan', 'Kowalski', '123-456-789', '1234567890', 'Kowalski Sp. z o.o.'),
-('Anna', 'Nowak', '987-654-321', '0987654321', 'Nowak & Partners');
+CREATE TABLE przypomnienia (
+    id SERIAL PRIMARY KEY,
+    notatka_id INTEGER NOT NULL REFERENCES notatki(id) ON DELETE CASCADE,
+    data_przypomnienia TIMESTAMP NOT NULL,
+    wyslane INTEGER DEFAULT 0 CHECK (wyslane IN (0, 1)),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-INSERT INTO notatki (klient_id, nr_rejestracyjny, tresc) VALUES
-(1, 'REJ001', 'Pierwsza notatka dla Jana Kowalskiego'),
-(2, 'REJ002', 'Notatka dla Anny Nowak');
+-- Przykładowe dane testowe
+INSERT INTO klienci (imie, nazwisko, nr_telefonu, nip, nazwa_firmy, email) VALUES
+('Jan', 'Kowalski', '123-456-789', '1234567890', 'Kowalski Sp. z o.o.', 'jan@kowalski.pl'),
+('Anna', 'Nowak', '987-654-321', '0987654321', 'Nowak & Partners', 'anna@nowak.pl');
+
+INSERT INTO samochody (klient_id, nr_rejestracyjny, marka, model, rok_produkcji) VALUES
+(1, 'KR12345', 'Toyota', 'Corolla', 2020),
+(2, 'WA67890', 'BMW', 'X5', 2019);
+
+INSERT INTO notatki (klient_id, typ_notatki, tresc) VALUES
+(1, 'szybka', 'Klient prosi o szybki kontakt'),
+(1, 'pojazd', 'Wymiana oleju w Toyocie');

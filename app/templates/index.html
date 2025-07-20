@@ -35,7 +35,8 @@
         th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
         th { background: #f8f9fa; font-weight: 600; }
         .notatka-szybka { background: #fff3cd; }
-        .notatka-pojazd { background: #d1ecf1; }
+        .notatka-pojazd { background: #d1ecf1; cursor: pointer; }
+        .notatka-pojazd:hover { background: #b8daff; }
         
         /* Modal styles */
         .modal { 
@@ -75,15 +76,15 @@
         }
         
         .przypomnienie-empty {
-            background: #d4edda; color: #155724; padding: 15px;
-            border-radius: 6px; text-align: center; font-weight: 600;
+            background: #f8f9fa; color: #6c757d; padding: 10px;
+            border-radius: 6px; text-align: center; font-size: 14px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚗 Notatnik Gębka</h1>
+            <h1>🚗 Notatnik Warsztatowy</h1>
             <button class="btn-success" onclick="openModal()">+ Dodaj Notatkę</button>
         </div>
 
@@ -111,7 +112,12 @@
                     </div>
                     
                     <div id="nr_rej_group" class="form-group" style="display: none;">
-                        <input type="text" name="nr_rejestracyjny" placeholder="Numer rejestracyjny pojazdu">
+                        <input type="text" id="nr_rejestracyjny" name="nr_rejestracyjny" placeholder="Numer rejestracyjny pojazdu">
+                        <button type="button" class="btn-primary" onclick="pobierzInformacje()" style="margin-left: 10px;">📋 Pobierz informacje</button>
+                    </div>
+                    
+                    <div id="pojazd_info" style="display: none; background: #e7f3ff; padding: 15px; margin: 10px 0; border-radius: 6px;">
+                        <!-- Informacje o pojeździe będą tutaj -->
                     </div>
                     
                     <div class="form-group">
@@ -120,6 +126,22 @@
                     
                     <button type="submit" class="btn-primary">Zapisz</button>
                     <button type="button" class="btn-secondary" onclick="closeModal()">Anuluj</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal edycji notatki -->
+        <div id="editModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeEditModal()">&times;</span>
+                <h3>Edytuj Notatkę</h3>
+                <form id="editForm">
+                    <div class="form-group">
+                        <textarea id="edit_tresc" placeholder="Treść notatki..." required></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary">Zapisz zmiany</button>
+                    <button type="button" class="btn-secondary" onclick="closeEditModal()">Anuluj</button>
                 </form>
             </div>
         </div>
@@ -153,7 +175,7 @@
                 <tr>
                     <th>Data</th>
                     <th>Typ</th>
-                    <th>Klient</th>
+                    <th>Właściciel</th>
                     <th>Pojazd</th>
                     <th>Treść</th>
                     <th>Akcje</th>
@@ -161,23 +183,22 @@
             </thead>
             <tbody>
                 {% for notatka in notatki %}
-                <tr class="notatka-{{ notatka.typ_notatki }}">
+                <tr class="notatka-{{ notatka.typ_notatki }}" data-nr-rej="{% if notatka.samochod %}{{ notatka.samochod.nr_rejestracyjny }}{% endif %}">
                     <td>{{ notatka.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
                     <td>
                         {% if notatka.typ_notatki == 'szybka' %}⚡ Szybka{% else %}🚙 Pojazd{% endif %}
                     </td>
                     <td>
-                        {% if notatka.klient %}
-                            {{ notatka.klient.imie }} {{ notatka.klient.nazwisko }}
+                        {% if notatka.samochod and notatka.samochod.klient %}
+                            {{ notatka.samochod.klient.imie }} {{ notatka.samochod.klient.nazwisko }}
                         {% else %}
                             Szybka notatka
                         {% endif %}
                     </td>
                     <td>
-                        {% if notatka.typ_notatki == 'pojazd' %}
-                            {% for ns in notatka.notatki_samochody %}
-                                {{ ns.samochod.nr_rejestracyjny }}<br>
-                            {% endfor %}
+                        {% if notatka.samochod %}
+                            {{ notatka.samochod.nr_rejestracyjny }}
+                            <br><small>{{ notatka.samochod.marka }} {{ notatka.samochod.model }}</small>
                         {% else %}
                             -
                         {% endif %}
@@ -186,6 +207,13 @@
                     <td>
                         <button class="btn-primary" onclick="editNote('{{ notatka.id }}')">✏️ Edytuj</button>
                         <button class="btn-danger" onclick="deleteNote('{{ notatka.id }}')">🗑️ Usuń</button>
+                        
+                        <!-- NOWY: Przycisk do kosztorysów -->
+                        {% if notatka.samochod %}
+                        <button class="btn-success" onclick="openKosztorysy('{{ notatka.samochod.nr_rejestracyjny }}')">
+                            💰 Kosztorysy
+                        </button>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -200,12 +228,29 @@
             requestNotificationPermission();
             loadPrzypomnienia();
             startNotificationChecker();
+            makeNotatkiClickable();
             
             // Ustaw minimalną datę na dziś
             const now = new Date();
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
             document.querySelector('input[type="datetime-local"]').min = now.toISOString().slice(0, 16);
         });
+
+        // NOWA funkcja: Klikalne wiersze notatek pojazdu
+        function makeNotatkiClickable() {
+            const rows = document.querySelectorAll('.notatka-pojazd');
+            rows.forEach(row => {
+                row.addEventListener('click', function(e) {
+                    // Sprawdź czy kliknięto przycisk
+                    if (e.target.tagName === 'BUTTON') return;
+                    
+                    const nrRej = this.dataset.nrRej;
+                    if (nrRej) {
+                        window.location.href = `/kosztorysy/${nrRej}`;
+                    }
+                });
+            });
+        }
 
         // Powiadomienia przeglądarki
         function requestNotificationPermission() {
@@ -290,6 +335,56 @@
                 });
         }
 
+        function pobierzInformacje() {
+            const nrRej = document.getElementById('nr_rejestracyjny').value;
+            if (!nrRej) {
+                alert('Wprowadź numer rejestracyjny');
+                return;
+            }
+            
+            fetch(`/api/pojazd-info/${nrRej}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+                    
+                    const infoDiv = document.getElementById('pojazd_info');
+                    infoDiv.innerHTML = `
+                        <h4>🚗 ${data.marka} ${data.model} (${data.rok_produkcji})</h4>
+                        <p><strong>Właściciel:</strong> ${data.wlasciciel}</p>
+                        
+                        <!-- Historia notatek samochodu -->
+                        <div style="margin: 15px 0;">
+                            <strong>📝 Historia notatek:</strong>
+                            ${data.notatki && data.notatki.length ? data.notatki.map(n => `
+                                <div style="background: white; padding: 8px; margin: 3px 0; border-radius: 4px; font-size: 12px;">
+                                    <strong>${n.data}:</strong> ${n.tresc}
+                                </div>
+                            `).join('') : '<p>Brak notatek</p>'}
+                        </div>
+                        
+                        <!-- Przycisk do kosztorysów -->
+                        <div style="margin: 15px 0;">
+                            <button class="btn-primary" onclick="openKosztorysy('${nrRej}')">
+                                📋 Pokaż kosztorysy właściciela
+                            </button>
+                        </div>
+                    `;
+                    infoDiv.style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('Błąd:', error);
+                    alert('Błąd pobierania danych');
+                });
+        }
+        
+        function openKosztorysy(nrRej) {
+            // Otwórz nową stronę z kosztorysami
+            window.location.href = `/kosztorysy/${nrRej}`;
+        }
+
         function openModal() {
             document.getElementById('noteModal').style.display = 'block';
         }
@@ -298,6 +393,7 @@
             document.getElementById('noteModal').style.display = 'none';
             document.getElementById('typ_notatki').value = '';
             document.getElementById('nr_rej_group').style.display = 'none';
+            document.getElementById('pojazd_info').style.display = 'none';
         }
         
         function openReminderModal() {
@@ -328,6 +424,7 @@
             const typ = document.getElementById('typ_notatki').value;
             const nrRej = document.getElementById('nr_rej_group');
             nrRej.style.display = typ === 'pojazd' ? 'block' : 'none';
+            document.getElementById('pojazd_info').style.display = 'none';
         }
         
         function deleteNote(id) {
@@ -338,7 +435,40 @@
         }
         
         function editNote(id) {
-            alert('Edycja - wkrótce!');
+            // Pobierz dane notatki
+            fetch(`/api/notatka/${id}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('edit_tresc').value = data.tresc;
+                    document.getElementById('editModal').style.display = 'block';
+                    
+                    // Ustaw handler dla formularza
+                    document.getElementById('editForm').onsubmit = function(e) {
+                        e.preventDefault();
+                        saveNoteEdit(id);
+                    };
+                });
+        }
+        
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+        
+        function saveNoteEdit(id) {
+            const tresc = document.getElementById('edit_tresc').value;
+            
+            fetch(`/notatka/edit/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({tresc: tresc})
+            })
+            .then(response => response.json())
+            .then(() => {
+                closeEditModal();
+                location.reload();
+            });
         }
         
         function markDone(id) {
@@ -357,8 +487,10 @@
         window.onclick = function(event) {
             const noteModal = document.getElementById('noteModal');
             const reminderModal = document.getElementById('reminderModal');
+            const editModal = document.getElementById('editModal');
             if (event.target == noteModal) closeModal();
             if (event.target == reminderModal) closeReminderModal();
+            if (event.target == editModal) closeEditModal();
         }
     </script>
 </body>

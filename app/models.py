@@ -16,8 +16,9 @@ class Klient(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
+    # POPRAWIONE RELACJE
     samochody = relationship("Samochod", back_populates="klient")
-    notatki = relationship("Notatka", back_populates="klient")
+    kosztorysy = relationship("Kosztorys", back_populates="klient")  # NOWE!
 
 class Samochod(Base):
     __tablename__ = "samochody"
@@ -31,14 +32,16 @@ class Samochod(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
+    # POPRAWIONE RELACJE
     klient = relationship("Klient", back_populates="samochody")
-    notatki_samochody = relationship("NotatkaSamochod", back_populates="samochod")
+    notatki = relationship("Notatka", back_populates="samochod")  # NOWE!
 
 class Notatka(Base):
     __tablename__ = "notatki"
     
     id = Column(Integer, primary_key=True, index=True)
-    klient_id = Column(Integer, ForeignKey("klienci.id"), nullable=True)
+    # ZMIENIONE: samochod_id zamiast klient_id
+    samochod_id = Column(Integer, ForeignKey("samochody.id"), nullable=True)  # NOWE!
     typ_notatki = Column(String(20), nullable=False)
     tresc = Column(Text, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
@@ -48,19 +51,11 @@ class Notatka(Base):
         CheckConstraint("typ_notatki IN ('szybka', 'pojazd')", name="check_typ_notatki"),
     )
     
-    klient = relationship("Klient", back_populates="notatki")
-    kosztorysy = relationship("Kosztorys", back_populates="notatka")
-    notatki_samochody = relationship("NotatkaSamochod", back_populates="notatka")
+    # POPRAWIONE RELACJE
+    samochod = relationship("Samochod", back_populates="notatki")  # NOWE!
+    przypomnienia = relationship("Przypomnienie", back_populates="notatka")  # NOWE!
 
-class NotatkaSamochod(Base):
-    __tablename__ = "notatki_samochody"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    notatka_id = Column(Integer, ForeignKey("notatki.id"))
-    samochod_id = Column(Integer, ForeignKey("samochody.id"))
-    
-    notatka = relationship("Notatka", back_populates="notatki_samochody")
-    samochod = relationship("Samochod", back_populates="notatki_samochody")
+# USUNIĘTO CAŁĄ KLASĘ NotatkaSamochod - niepotrzebna!
 
 class Przypomnienie(Base):
     __tablename__ = "przypomnienia"
@@ -71,15 +66,17 @@ class Przypomnienie(Base):
     wyslane = Column(Integer, default=0)  # 0=nie, 1=tak
     created_at = Column(DateTime, server_default=func.now())
     
-    notatka = relationship("Notatka")
+    # POPRAWIONE RELACJE
+    notatka = relationship("Notatka", back_populates="przypomnienia")
 
 class Kosztorys(Base):
     __tablename__ = "kosztorysy"
     
     id = Column(Integer, primary_key=True, index=True)
-    notatka_id = Column(Integer, ForeignKey("notatki.id"))
+    # ZMIENIONE: klient_id zamiast notatka_id
+    klient_id = Column(Integer, ForeignKey("klienci.id"))  # NOWE!
     numer_kosztorysu = Column(String(50), unique=True)
-    kwota = Column(DECIMAL(10, 2))
+    kwota_calkowita = Column(DECIMAL(10, 2))  # POPRAWIONE: kwota_calkowita jak w bazie
     opis = Column(Text)
     status = Column(String(20), default="draft")
     created_at = Column(DateTime, server_default=func.now())
@@ -89,4 +86,36 @@ class Kosztorys(Base):
         CheckConstraint("status IN ('draft', 'approved', 'rejected')", name="check_status"),
     )
     
-    notatka = relationship("Notatka", back_populates="kosztorysy")
+    # POPRAWIONE RELACJE
+    klient = relationship("Klient", back_populates="kosztorysy")  # NOWE!
+    kosztorysy_towary = relationship("KosztorysTowar", back_populates="kosztorys")
+
+class Towar(Base):
+    __tablename__ = "towary"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    kod = Column(String(50), unique=True, nullable=False)
+    nazwa = Column(String(200), nullable=False)
+    cena_zakupu = Column(DECIMAL(10, 2))
+    cena_sprzedazy = Column(DECIMAL(10, 2))
+    stan_magazynowy = Column(Integer, default=0)
+    jednostka = Column(String(20), default='szt')
+    kategoria = Column(String(100))
+    opis = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+    
+    kosztorysy_towary = relationship("KosztorysTowar", back_populates="towar")
+
+class KosztorysTowar(Base):
+    __tablename__ = "kosztorysy_towary"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    kosztorys_id = Column(Integer, ForeignKey("kosztorysy.id"))
+    towar_id = Column(Integer, ForeignKey("towary.id"))
+    ilosc = Column(DECIMAL(10, 2), nullable=False)
+    cena_jednostkowa = Column(DECIMAL(10, 2), nullable=False)
+    wartosc = Column(DECIMAL(10, 2), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    
+    kosztorys = relationship("Kosztorys", back_populates="kosztorysy_towary")
+    towar = relationship("Towar", back_populates="kosztorysy_towary")

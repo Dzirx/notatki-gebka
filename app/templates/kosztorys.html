@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kosztorysy - {{ pojazd.nr_rejestracyjny }}</title>
+    <meta charset="utf-8">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5; 
+        }
+        
+        .container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+        }
+        
+        .header-card {
+            background: white; 
+            border-radius: 8px; 
+            padding: 20px; 
+            margin-bottom: 20px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #007bff;
+        }
+        
+        .pojazd-info {
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+        }
+        
+        .pojazd-details h2 {
+            margin: 0 0 10px 0; 
+            color: #007bff;
+        }
+        
+        .pojazd-details p {
+            margin: 5px 0; 
+            color: #6c757d;
+        }
+        
+        .back-button {
+            padding: 10px 20px; 
+            background: #6c757d; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .back-button:hover {
+            background: #5a6268;
+        }
+        
+        .kosztorys-card {
+            background: white; 
+            border-radius: 8px; 
+            margin: 20px 0; 
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border: 1px solid #dee2e6;
+        }
+        
+        .kosztorys-header {
+            background: #f8f9fa; 
+            padding: 15px; 
+            border-bottom: 1px solid #dee2e6;
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+        }
+        
+        .kosztorys-number {
+            color: #28a745; 
+            font-size: 18px; 
+            font-weight: bold;
+        }
+        
+        .kosztorys-opis {
+            color: #6c757d; 
+            font-size: 14px; 
+            margin-top: 3px;
+        }
+        
+        .kosztorys-kwota {
+            font-weight: bold; 
+            color: #dc3545; 
+            font-size: 20px;
+        }
+        
+        .kosztorys-data {
+            font-size: 12px; 
+            color: #6c757d;
+            margin-top: 3px;
+        }
+        
+        .status-badge {
+            font-size: 10px; 
+            padding: 4px 8px; 
+            border-radius: 12px; 
+            margin-top: 5px;
+            display: inline-block;
+        }
+        
+        .status-draft { 
+            background: #fff3cd; 
+            color: #856404; 
+        }
+        
+        .status-approved { 
+            background: #d4edda; 
+            color: #155724; 
+        }
+        
+        .status-rejected { 
+            background: #f8d7da; 
+            color: #721c24; 
+        }
+        
+        .towary-table {
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 0;
+        }
+        
+        .towary-table th {
+            background: #495057; 
+            color: white; 
+            padding: 12px; 
+            font-size: 12px; 
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        .towary-table td {
+            padding: 10px 12px; 
+            font-size: 13px; 
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .towary-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .kod-towaru {
+            font-family: 'Courier New', monospace; 
+            background: #f1f3f4; 
+            padding: 3px 6px; 
+            border-radius: 4px;
+            color: #495057;
+            font-weight: bold;
+        }
+        
+        .center { text-align: center; }
+        .right { text-align: right; }
+        
+        .wartosc-col {
+            text-align: right; 
+            font-weight: bold; 
+            color: #dc3545;
+        }
+        
+        .empty-kosztorys {
+            padding: 30px; 
+            text-align: center; 
+            color: #6c757d; 
+            font-style: italic;
+            background: #f8f9fa;
+        }
+        
+        .no-towary {
+            padding: 20px; 
+            text-align: center; 
+            color: #6c757d; 
+            font-style: italic;
+            background: #f8f9fa;
+        }
+        
+        .suma-section {
+            background: #e9ecef; 
+            padding: 15px; 
+            border-top: 2px solid #adb5bd;
+        }
+        
+        .suma-row {
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        .print-button {
+            padding: 10px 20px; 
+            background: #28a745; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        
+        .print-button:hover {
+            background: #218838;
+        }
+        
+        @media print {
+            .back-button, .print-button { display: none; }
+            body { background: white; }
+            .container { max-width: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header z informacjami o pojeździe -->
+        <div class="header-card">
+            <div class="pojazd-info">
+                <div class="pojazd-details">
+                    <h2>🚗 {{ pojazd.marka }} {{ pojazd.model }} ({{ pojazd.rok_produkcji }})</h2>
+                    <p><strong>Właściciel:</strong> {{ pojazd.wlasciciel }}</p>
+                    <p><strong>Nr rejestracyjny:</strong> {{ pojazd.nr_rejestracyjny }}</p>
+                </div>
+                <div>
+                    <a href="/" class="back-button">← Powrót</a>
+                    <button class="print-button" onclick="window.print()">🖨️ Drukuj</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Kosztorysy -->
+        {% if kosztorysy %}
+            {% for kosztorys in kosztorysy %}
+            <div class="kosztorys-card">
+                <!-- Header kosztorysu -->
+                <div class="kosztorys-header">
+                    <div>
+                        <div class="kosztorys-number">📋 {{ kosztorys.numer }}</div>
+                        <div class="kosztorys-opis">{{ kosztorys.opis }}</div>
+                        <div class="kosztorys-data">{{ kosztorys.created_at.strftime('%d.%m.%Y') }}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="kosztorys-kwota">{{ "%.2f"|format(kosztorys.kwota_calkowita) }} zł</div>
+                        <div class="status-badge status-{{ kosztorys.status }}">
+                            {% if kosztorys.status == 'draft' %}SZKIC
+                            {% elif kosztorys.status == 'approved' %}ZATWIERDZONY
+                            {% elif kosztorys.status == 'rejected' %}ODRZUCONY
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Towary w kosztorysie -->
+                {% if kosztorys.towary %}
+                <table class="towary-table">
+                    <thead>
+                        <tr>
+                            <th>Kod</th>
+                            <th>Nazwa towaru</th>
+                            <th class="center">Ilość</th>
+                            <th class="right">Cena jedn.</th>
+                            <th class="right">Wartość</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for towar in kosztorys.towary %}
+                        <tr>
+                            <td><span class="kod-towaru">{{ towar.kod }}</span></td>
+                            <td>{{ towar.nazwa }}</td>
+                            <td class="center">{{ towar.ilosc }} {{ towar.jednostka }}</td>
+                            <td class="right">{{ "%.2f"|format(towar.cena) }} zł</td>
+                            <td class="wartosc-col">{{ "%.2f"|format(towar.wartosc) }} zł</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                
+                <!-- Suma kosztorysu -->
+                <div class="suma-section">
+                    <div class="suma-row">
+                        <span>Suma kosztorysu:</span>
+                        <span style="color: #dc3545;">{{ "%.2f"|format(kosztorys.kwota_calkowita) }} zł</span>
+                    </div>
+                </div>
+                {% else %}
+                <div class="no-towary">
+                    Brak towarów w tym kosztorysie
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="empty-kosztorys">
+            <h3>Brak kosztorysów</h3>
+            <p>Dla tego pojazdu nie ma jeszcze żadnych kosztorysów.</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <script>
+        // Funkcje JavaScript dla interakcji
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Strona kosztorysów załadowana');
+            
+            // Dodaj hover effect na towary
+            const rows = document.querySelectorAll('.towary-table tbody tr');
+            rows.forEach(row => {
+                row.addEventListener('mouseenter', function() {
+                    this.style.backgroundColor = '#e3f2fd';
+                });
+                row.addEventListener('mouseleave', function() {
+                    this.style.backgroundColor = '';
+                });
+            });
+        });
+        
+        // Funkcja do drukowania konkretnego kosztorysu
+        function printKosztorys(kosztorysId) {
+            // Ukryj wszystkie kosztorysy oprócz wybranego
+            const allKosztorysy = document.querySelectorAll('.kosztorys-card');
+            allKosztorysy.forEach(k => {
+                if (k.dataset.id !== kosztorysId) {
+                    k.style.display = 'none';
+                }
+            });
+            
+            window.print();
+            
+            // Przywróć wszystkie kosztorysy
+            allKosztorysy.forEach(k => {
+                k.style.display = 'block';
+            });
+        }
+    </script>
+</body>
+</html>

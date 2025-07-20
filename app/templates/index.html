@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Notatnik Gębka</title>
+    <title>Notatnik Warsztatowy</title>
     <meta charset="utf-8">
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
@@ -17,15 +17,22 @@
             cursor: pointer; font-size: 14px; transition: all 0.3s;
         }
         .btn-primary { background: #007bff; color: white; }
-        .btn-primary:hover { background: #0056b3; transform: translateY(-1px); }
+        .btn-primary:hover { background: #0056b3; }
         .btn-success { background: #28a745; color: white; }
-        .btn-success:hover { background: #218838; transform: translateY(-1px); }
+        .btn-success:hover { background: #218838; }
         .btn-secondary { background: #6c757d; color: white; }
         .btn-secondary:hover { background: #5a6268; }
         .btn-warning { background: #ffc107; color: #212529; }
         .btn-warning:hover { background: #e0a800; }
         .btn-danger { background: #dc3545; color: white; }
         .btn-danger:hover { background: #c82333; }
+        
+        .header { 
+            background: white; padding: 20px; border-radius: 8px; 
+            margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .header h1 { margin: 0; }
         
         table { 
             width: 100%; border-collapse: collapse; margin: 20px 0; 
@@ -34,21 +41,18 @@
         }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
         th { background: #f8f9fa; font-weight: 600; }
-        .notatka-szybka { background: #fff3cd; }
         .notatka-pojazd { background: #d1ecf1; cursor: pointer; }
         .notatka-pojazd:hover { background: #b8daff; }
+        .notatka-szybka { background: #fff3cd; }
         
-        /* Modal styles */
         .modal { 
             display: none; position: fixed; z-index: 1000; left: 0; top: 0;
             width: 100%; height: 100%; background: rgba(0,0,0,0.5);
-            animation: fadeIn 0.3s;
         }
         .modal-content { 
             background: white; margin: 5% auto; padding: 30px; 
             width: 90%; max-width: 500px; border-radius: 12px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            animation: slideIn 0.3s;
         }
         .close { 
             color: #aaa; float: right; font-size: 28px; font-weight: bold;
@@ -56,138 +60,61 @@
         }
         .close:hover { color: #000; }
         
-        @keyframes fadeIn { from {opacity: 0;} to {opacity: 1;} }
-        @keyframes slideIn { from {transform: translateY(-50px);} to {transform: translateY(0);} }
+        .search-rej {
+            display: flex; align-items: center; margin-bottom: 15px;
+        }
+        .search-rej input { flex: 1; margin-right: 10px; }
         
-        .header { 
-            background: white; padding: 20px; border-radius: 8px; 
+        .hidden { display: none !important; }
+        
+        .actions-bar {
+            background: white; padding: 15px; border-radius: 8px; 
             margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .przypomnienia-box {
-            background: white; padding: 20px; border-radius: 8px; 
-            margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .przypomnienie-item {
-            background: #fff3cd; border-left: 4px solid #ffc107;
-            padding: 15px; margin: 10px 0; border-radius: 6px;
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        
-        .przypomnienie-empty {
-            background: #f8f9fa; color: #6c757d; padding: 10px;
-            border-radius: 6px; text-align: center; font-size: 14px;
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- HEADER -->
         <div class="header">
             <h1>🚗 Notatnik Warsztatowy</h1>
             <button class="btn-success" onclick="openModal()">+ Dodaj Notatkę</button>
         </div>
 
-        <!-- Przypomnienia na dziś -->
-        <div class="przypomnienia-box">
-            <h3>🔔 Przypomnienia na dziś</h3>
-            <div id="przypomnienia-container">
-                <!-- Ładowane dynamicznie -->
-            </div>
-            <button class="btn-primary" onclick="openReminderModal()">+ Dodaj Przypomnienie</button>
+        <!-- WYSZUKIWANIE -->
+        <div class="search-rej">
+            <input type="text" id="searchRejInput" placeholder="Wyszukaj po numerze rejestracyjnym..." oninput="filterNotatkiByRej()">
+            <button class="btn-secondary" onclick="clearRejSearch()">Wyczyść</button>
         </div>
 
-        <!-- Modal dodawania notatki -->
-        <div id="noteModal" class="modal">
-            <div class="modal-content">
-                <span class="close" onclick="closeModal()">&times;</span>
-                <h3>Dodaj Notatkę</h3>
-                <form action="/notatka/add" method="post">
-                    <div class="form-group">
-                        <select id="typ_notatki" name="typ_notatki" onchange="toggleNotatkType()" required>
-                            <option value="">Wybierz typ notatki</option>
-                            <option value="szybka">⚡ Szybka notatka</option>
-                            <option value="pojazd">🚙 Notatka do pojazdu</option>
-                        </select>
-                    </div>
-                    
-                    <div id="nr_rej_group" class="form-group" style="display: none;">
-                        <input type="text" id="nr_rejestracyjny" name="nr_rejestracyjny" placeholder="Numer rejestracyjny pojazdu">
-                        <button type="button" class="btn-primary" onclick="pobierzInformacje()" style="margin-left: 10px;">📋 Pobierz informacje</button>
-                    </div>
-                    
-                    <div id="pojazd_info" style="display: none; background: #e7f3ff; padding: 15px; margin: 10px 0; border-radius: 6px;">
-                        <!-- Informacje o pojeździe będą tutaj -->
-                    </div>
-                    
-                    <div class="form-group">
-                        <textarea name="tresc" placeholder="Treść notatki..." required></textarea>
-                    </div>
-                    
-                    <button type="submit" class="btn-primary">Zapisz</button>
-                    <button type="button" class="btn-secondary" onclick="closeModal()">Anuluj</button>
-                </form>
-            </div>
+        <!-- AKCJE GRUPOWE -->
+        <div class="actions-bar">
+            <button class="btn-warning" onclick="editSelected()">✏️ Edytuj zaznaczone</button>
+            <button class="btn-danger" onclick="deleteSelected()">🗑️ Usuń zaznaczone</button>
+            <span style="margin-left: 15px; color: #6c757d;">Zaznacz notatki checkboxami w tabeli</span>
         </div>
 
-        <!-- Modal edycji notatki -->
-        <div id="editModal" class="modal">
-            <div class="modal-content">
-                <span class="close" onclick="closeEditModal()">&times;</span>
-                <h3>Edytuj Notatkę</h3>
-                <form id="editForm">
-                    <div class="form-group">
-                        <textarea id="edit_tresc" placeholder="Treść notatki..." required></textarea>
-                    </div>
-                    
-                    <button type="submit" class="btn-primary">Zapisz zmiany</button>
-                    <button type="button" class="btn-secondary" onclick="closeEditModal()">Anuluj</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Modal przypomnienia -->
-        <div id="reminderModal" class="modal">
-            <div class="modal-content">
-                <span class="close" onclick="closeReminderModal()">&times;</span>
-                <h3>Dodaj Przypomnienie</h3>
-                <form action="/przypomnienie/add" method="post">
-                    <div class="form-group">
-                        <select name="notatka_id" id="notatka_select" required>
-                            <option value="">Wybierz notatkę</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <input type="datetime-local" name="data_przypomnienia" required>
-                    </div>
-                    
-                    <button type="submit" class="btn-primary">Zapisz</button>
-                    <button type="button" class="btn-secondary" onclick="closeReminderModal()">Anuluj</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Wszystkie notatki -->
+        <!-- TABELA NOTATEK -->
         <h3>📝 Wszystkie notatki</h3>
         <table>
             <thead>
                 <tr>
+                    <th width="40">
+                        <input type="checkbox" id="selectAll" onchange="toggleAllCheckboxes()">
+                    </th>
                     <th>Data</th>
-                    <th>Typ</th>
                     <th>Właściciel</th>
                     <th>Pojazd</th>
                     <th>Treść</th>
-                    <th>Akcje</th>
                 </tr>
             </thead>
             <tbody>
                 {% for notatka in notatki %}
                 <tr class="notatka-{{ notatka.typ_notatki }}" data-nr-rej="{% if notatka.samochod %}{{ notatka.samochod.nr_rejestracyjny }}{% endif %}">
-                    <td>{{ notatka.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
                     <td>
-                        {% if notatka.typ_notatki == 'szybka' %}⚡ Szybka{% else %}🚙 Pojazd{% endif %}
+                        <input type="checkbox" class="note-checkbox" value="{{ notatka.id }}">
                     </td>
+                    <td>{{ notatka.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
                     <td>
                         {% if notatka.samochod and notatka.samochod.klient %}
                             {{ notatka.samochod.klient.imie }} {{ notatka.samochod.klient.nazwisko }}
@@ -204,144 +131,194 @@
                         {% endif %}
                     </td>
                     <td>{{ notatka.tresc }}</td>
-                    <td>
-                        <button class="btn-primary" onclick="editNote('{{ notatka.id }}')">✏️ Edytuj</button>
-                        <button class="btn-danger" onclick="deleteNote('{{ notatka.id }}')">🗑️ Usuń</button>
-                        
-                        <!-- NOWY: Przycisk do kosztorysów -->
-                        {% if notatka.samochod %}
-                        <button class="btn-success" onclick="openKosztorysy('{{ notatka.samochod.nr_rejestracyjny }}')">
-                            💰 Kosztorysy
-                        </button>
-                        {% endif %}
-                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+
+        <!-- MODAL: DODAJ NOTATKĘ -->
+        <div id="noteModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <h3>Dodaj Notatkę</h3>
+                <form action="/notatka/add" method="post">
+                    <div class="form-group">
+                        <select id="typ_notatki" name="typ_notatki" onchange="toggleNotatkType()" required>
+                            <option value="">Wybierz typ notatki</option>
+                            <option value="szybka">⚡ Szybka notatka</option>
+                            <option value="pojazd">🚙 Notatka do pojazdu</option>
+                        </select>
+                    </div>
+                    
+                    <div id="nr_rej_group" class="form-group hidden">
+                        <input type="text" id="nr_rejestracyjny" name="nr_rejestracyjny" placeholder="Numer rejestracyjny pojazdu">
+                        <button type="button" class="btn-primary" onclick="pobierzInformacje()">📋 Pobierz informacje</button>
+                    </div>
+                    
+                    <div id="pojazd_info" class="hidden" style="background: #e7f3ff; padding: 15px; margin: 10px 0; border-radius: 6px;">
+                        <!-- Informacje o pojeździe -->
+                    </div>
+                    
+                    <div class="form-group">
+                        <textarea name="tresc" placeholder="Treść notatki..." required></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary">Zapisz</button>
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Anuluj</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- MODAL: EDYTUJ NOTATKĘ -->
+        <div id="editModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeEditModal()">&times;</span>
+                <h3>Edytuj Notatkę</h3>
+                <form id="editForm">
+                    <div class="form-group">
+                        <textarea id="edit_tresc" placeholder="Treść notatki..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary">Zapisz zmiany</button>
+                    <button type="button" class="btn-secondary" onclick="closeEditModal()">Anuluj</button>
+                </form>
+            </div>
+        </div>
     </div>
 
     <script>
-        // Ładowanie przypomnień przy starcie
+        let currentEditId = null;
+
+        // INICJALIZACJA
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Strona załadowana');
-            requestNotificationPermission();
-            loadPrzypomnienia();
-            startNotificationChecker();
             makeNotatkiClickable();
-            
-            // Ustaw minimalną datę na dziś
-            const now = new Date();
-            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-            document.querySelector('input[type="datetime-local"]').min = now.toISOString().slice(0, 16);
         });
 
-        // NOWA funkcja: Klikalne wiersze notatek pojazdu
-        function makeNotatkiClickable() {
-            const rows = document.querySelectorAll('.notatka-pojazd');
+        // MODALE
+        function openModal() {
+            document.getElementById('noteModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('noteModal').style.display = 'none';
+            document.getElementById('typ_notatki').value = '';
+            document.getElementById('nr_rej_group').classList.add('hidden');
+            document.getElementById('pojazd_info').classList.add('hidden');
+            document.querySelector('textarea[name="tresc"]').value = '';
+        }
+
+        function openEditModal(notatkaId) {
+            currentEditId = notatkaId;
+            fetch(`/api/notatka/${notatkaId}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('edit_tresc').value = data.tresc;
+                    document.getElementById('editModal').style.display = 'block';
+                })
+                .catch(() => alert('Błąd pobierania notatki'));
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+            currentEditId = null;
+        }
+
+        // TOGGLE TYP NOTATKI
+        function toggleNotatkType() {
+            const typ = document.getElementById('typ_notatki').value;
+            const nrRejGroup = document.getElementById('nr_rej_group');
+            const pojazdInfo = document.getElementById('pojazd_info');
+            
+            if (typ === 'pojazd') {
+                nrRejGroup.classList.remove('hidden');
+            } else {
+                nrRejGroup.classList.add('hidden');
+                pojazdInfo.classList.add('hidden');
+            }
+        }
+
+        // WYSZUKIWANIE
+        function filterNotatkiByRej() {
+            const filter = document.getElementById('searchRejInput').value.toUpperCase();
+            const rows = document.querySelectorAll('tbody tr');
+            
             rows.forEach(row => {
+                const nrRej = (row.getAttribute('data-nr-rej') || '').toUpperCase();
+                row.style.display = nrRej.includes(filter) ? '' : 'none';
+            });
+        }
+
+        function clearRejSearch() {
+            document.getElementById('searchRejInput').value = '';
+            filterNotatkiByRej();
+        }
+
+        // KLIKNIĘCIE W NOTATKĘ POJAZDU
+        function makeNotatkiClickable() {
+            document.querySelectorAll('.notatka-pojazd').forEach(row => {
                 row.addEventListener('click', function(e) {
-                    // Sprawdź czy kliknięto przycisk
-                    if (e.target.tagName === 'BUTTON') return;
-                    
+                    if (e.target.type === 'checkbox') return;
                     const nrRej = this.dataset.nrRej;
-                    if (nrRej) {
-                        window.location.href = `/kosztorysy/${nrRej}`;
-                    }
+                    if (nrRej) window.location.href = `/kosztorysy/${nrRej}`;
                 });
             });
         }
 
-        // Powiadomienia przeglądarki
-        function requestNotificationPermission() {
-            console.log('Sprawdzam powiadomienia...');
-            if ('Notification' in window) {
-                console.log('Obecny status:', Notification.permission);
-                if (Notification.permission === 'default') {
-                    Notification.requestPermission().then(permission => {
-                        console.log('Pozwolenie:', permission);
-                        if (permission === 'granted') {
-                            console.log('Powiadomienia włączone');
-                            // Test powiadomienia
-                            showNotification('Test', 'Powiadomienia działają!');
-                        }
-                    });
-                }
-            } else {
-                console.log('Powiadomienia nie są obsługiwane');
+        // CHECKBOXY
+        function toggleAllCheckboxes() {
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.note-checkbox');
+            
+            checkboxes.forEach(cb => {
+                cb.checked = selectAll.checked;
+            });
+        }
+
+        function getSelectedNotes() {
+            const checkboxes = document.querySelectorAll('.note-checkbox:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        // AKCJE GRUPOWE
+        function editSelected() {
+            const selected = getSelectedNotes();
+            if (selected.length === 0) {
+                alert('Zaznacz przynajmniej jedną notatkę');
+                return;
+            }
+            if (selected.length > 1) {
+                alert('Wybierz tylko jedną notatkę do edycji');
+                return;
+            }
+            
+            openEditModal(selected[0]);
+        }
+
+        function deleteSelected() {
+            const selected = getSelectedNotes();
+            if (selected.length === 0) {
+                alert('Zaznacz przynajmniej jedną notatkę');
+                return;
+            }
+            
+            if (confirm(`Czy na pewno chcesz usunąć ${selected.length} notatek?`)) {
+                Promise.all(selected.map(id => 
+                    fetch(`/notatka/delete/${id}`, { method: 'DELETE' })
+                )).then(() => {
+                    location.reload();
+                }).catch(() => {
+                    alert('Błąd usuwania notatek');
+                });
             }
         }
 
-        function showNotification(title, message) {
-            if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification(title, {
-                    body: message,
-                    icon: '🔔',
-                    requireInteraction: true,
-                    tag: 'przypomnienie'
-                });
-            }
-        }
-
-        function startNotificationChecker() {
-            // Sprawdzaj co 30 sekund
-            setInterval(checkActiveReminders, 30000);
-            checkActiveReminders(); // Sprawdź od razu
-        }
-
-        function checkActiveReminders() {
-            console.log('Sprawdzam aktywne przypomnienia...');
-            fetch('/api/przypomnienia-aktywne')
-                .then(response => {
-                    console.log('Response status:', response.status);
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Otrzymane przypomnienia:', data);
-                    data.forEach(p => {
-                        console.log('Pokazuję powiadomienie:', p);
-                        showNotification(
-                            '🔔 Przypomnienie!', 
-                            `${p.godzina} - ${p.notatka_tresc}`
-                        );
-                    });
-                })
-                .catch(error => {
-                    console.error('Błąd przy sprawdzaniu przypomnień:', error);
-                });
-        }
-
-        function loadPrzypomnienia() {
-            fetch('/api/przypomnienia-dzisiaj')
-                .then(response => response.json())
-                .then(data => {
-                    const container = document.getElementById('przypomnienia-container');
-                    if (data.length === 0) {
-                        container.innerHTML = '<div class="przypomnienie-empty">✅ Brak przypomnień na dziś</div>';
-                    } else {
-                        container.innerHTML = data.map(p => `
-                            <div class="przypomnienie-item">
-                                <div>
-                                    <strong>${p.godzina}</strong> - ${p.notatka_tresc}
-                                    ${p.klient ? `<br><small>Klient: ${p.klient}</small>` : ''}
-                                </div>
-                                <div>
-                                    <button class="btn-warning" onclick="markDone(${p.id})">✓</button>
-                                    <button class="btn-danger" onclick="deleteReminder(${p.id})">🗑️</button>
-                                </div>
-                            </div>
-                        `).join('');
-                    }
-                });
-        }
-
+        // POBIERZ INFORMACJE O POJEŹDZIE
         function pobierzInformacje() {
             const nrRej = document.getElementById('nr_rejestracyjny').value;
             if (!nrRej) {
                 alert('Wprowadź numer rejestracyjny');
                 return;
             }
-            
+
             fetch(`/api/pojazd-info/${nrRej}`)
                 .then(response => response.json())
                 .then(data => {
@@ -349,149 +326,64 @@
                         alert(data.error);
                         return;
                     }
-                    
+
                     const infoDiv = document.getElementById('pojazd_info');
                     infoDiv.innerHTML = `
                         <h4>🚗 ${data.marka} ${data.model} (${data.rok_produkcji})</h4>
                         <p><strong>Właściciel:</strong> ${data.wlasciciel}</p>
-                        
-                        <!-- Historia notatek samochodu -->
                         <div style="margin: 15px 0;">
                             <strong>📝 Historia notatek:</strong>
-                            ${data.notatki && data.notatki.length ? data.notatki.map(n => `
-                                <div style="background: white; padding: 8px; margin: 3px 0; border-radius: 4px; font-size: 12px;">
-                                    <strong>${n.data}:</strong> ${n.tresc}
-                                </div>
-                            `).join('') : '<p>Brak notatek</p>'}
+                            ${data.notatki && data.notatki.length ? 
+                                data.notatki.map(n => `
+                                    <div style="background: white; padding: 8px; margin: 3px 0; border-radius: 4px; font-size: 12px;">
+                                        <strong>${n.data}:</strong> ${n.tresc}
+                                    </div>
+                                `).join('') : 
+                                '<p>Brak notatek</p>'
+                            }
                         </div>
-                        
-                        <!-- Przycisk do kosztorysów -->
-                        <div style="margin: 15px 0;">
-                            <button class="btn-primary" onclick="openKosztorysy('${nrRej}')">
-                                📋 Pokaż kosztorysy właściciela
-                            </button>
-                        </div>
+                        <button class="btn-primary" onclick="window.location.href='/kosztorysy/${nrRej}'">
+                            📋 Pokaż kosztorysy właściciela
+                        </button>
                     `;
-                    infoDiv.style.display = 'block';
+                    infoDiv.classList.remove('hidden');
                 })
-                .catch(error => {
-                    console.error('Błąd:', error);
-                    alert('Błąd pobierania danych');
-                });
-        }
-        
-        function openKosztorysy(nrRej) {
-            // Otwórz nową stronę z kosztorysami
-            window.location.href = `/kosztorysy/${nrRej}`;
+                .catch(() => alert('Błąd pobierania danych'));
         }
 
-        function openModal() {
-            document.getElementById('noteModal').style.display = 'block';
-        }
-        
-        function closeModal() {
-            document.getElementById('noteModal').style.display = 'none';
-            document.getElementById('typ_notatki').value = '';
-            document.getElementById('nr_rej_group').style.display = 'none';
-            document.getElementById('pojazd_info').style.display = 'none';
-        }
-        
-        function openReminderModal() {
-            document.getElementById('reminderModal').style.display = 'block';
-            loadNotatki();
-        }
-        
-        function closeReminderModal() {
-            document.getElementById('reminderModal').style.display = 'none';
-        }
-        
-        function loadNotatki() {
-            fetch('/api/notatki')
-                .then(response => response.json())
-                .then(data => {
-                    const select = document.getElementById('notatka_select');
-                    select.innerHTML = '<option value="">Wybierz notatkę</option>';
-                    data.forEach(notatka => {
-                        const option = document.createElement('option');
-                        option.value = notatka.id;
-                        option.textContent = notatka.tresc;
-                        select.appendChild(option);
-                    });
-                });
-        }
-        
-        function toggleNotatkType() {
-            const typ = document.getElementById('typ_notatki').value;
-            const nrRej = document.getElementById('nr_rej_group');
-            nrRej.style.display = typ === 'pojazd' ? 'block' : 'none';
-            document.getElementById('pojazd_info').style.display = 'none';
-        }
-        
-        function deleteNote(id) {
-            if(confirm('Czy na pewno chcesz usunąć tę notatkę?')) {
-                fetch(`/notatka/delete/${id}`, {method: 'DELETE'})
-                .then(() => location.reload());
-            }
-        }
-        
-        function editNote(id) {
-            // Pobierz dane notatki
-            fetch(`/api/notatka/${id}`)
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('edit_tresc').value = data.tresc;
-                    document.getElementById('editModal').style.display = 'block';
-                    
-                    // Ustaw handler dla formularza
-                    document.getElementById('editForm').onsubmit = function(e) {
-                        e.preventDefault();
-                        saveNoteEdit(id);
-                    };
-                });
-        }
-        
-        function closeEditModal() {
-            document.getElementById('editModal').style.display = 'none';
-        }
-        
-        function saveNoteEdit(id) {
+        // EDYCJA NOTATKI
+        document.getElementById('editForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (!currentEditId) return;
+
             const tresc = document.getElementById('edit_tresc').value;
             
-            fetch(`/notatka/edit/${id}`, {
+            fetch(`/notatka/edit/${currentEditId}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({tresc: tresc})
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tresc: tresc })
             })
-            .then(response => response.json())
-            .then(() => {
-                closeEditModal();
-                location.reload();
+            .then(response => {
+                if (response.ok) {
+                    closeEditModal();
+                    location.reload();
+                } else {
+                    alert('Błąd zapisywania zmian');
+                }
+            })
+            .catch(() => alert('Błąd połączenia'));
+        });
+
+        // ZAMYKANIE MODALI PRZEZ KLIKNIĘCIE TŁA
+        window.addEventListener('click', function(event) {
+            const modals = ['noteModal', 'editModal'];
+            modals.forEach(modalId => {
+                const modal = document.getElementById(modalId);
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
             });
-        }
-        
-        function markDone(id) {
-            fetch(`/przypomnienie/mark/${id}`, {method: 'POST'})
-            .then(() => loadPrzypomnienia());
-        }
-        
-        function deleteReminder(id) {
-            if(confirm('Usunąć przypomnienie?')) {
-                fetch(`/przypomnienie/delete/${id}`, {method: 'DELETE'})
-                .then(() => loadPrzypomnienia());
-            }
-        }
-        
-        // Zamknij modal po kliknięciu poza nim
-        window.onclick = function(event) {
-            const noteModal = document.getElementById('noteModal');
-            const reminderModal = document.getElementById('reminderModal');
-            const editModal = document.getElementById('editModal');
-            if (event.target == noteModal) closeModal();
-            if (event.target == reminderModal) closeReminderModal();
-            if (event.target == editModal) closeEditModal();
-        }
+        });
     </script>
 </body>
 </html>

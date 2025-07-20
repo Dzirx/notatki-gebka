@@ -1,69 +1,54 @@
+# === IMPORTY ===
 from fastapi import FastAPI, Depends, Form, Request
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates  # Renderowanie HTML
+from fastapi.responses import HTMLResponse, RedirectResponse  # Typy odpowiedzi
+from fastapi.staticfiles import StaticFiles  # Pliki statyczne (CSS, JS)
 from sqlalchemy.orm import Session
 import crud
 from database import get_db
-from models import Notatka, Przypomnienie, Samochod, Kosztorys  # POPRAWIONE: Dodane importy
-from sqlalchemy import and_
-from datetime import datetime, timedelta
+from models import Notatka, Samochod, Kosztorys, Klient
+from sqlalchemy.orm import joinedload
 
+# === KONFIGURACJA FASTAPI ===
 app = FastAPI()
-# POPRAWIONE: Folder templates
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="templates")  # Folder z szablonami HTML
 
-# Serwowanie plików statycznych (jeśli są)
-# app.mount("/static", StaticFiles(directory="static"), name="static")
+# === STRONY HTML ===
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)):
-    notatki = db.query(Notatka).order_by(Notatka.created_at.desc()).all()
+    """STRONA GŁÓWNA - Lista wszystkich notatek z informacjami o samochodach i klientach"""
+    
+    # Pobieranie notatek z eager loading (optymalizacja - unika N+1 queries)
+    notatki = db.query(Notatka).options(
+        joinedload(Notatka.samochod).joinedload(Samochod.klient)
+    ).order_by(Notatka.created_at.desc()).all()
+    
+    # Lista klientów dla interfejsu
     klienci = crud.get_klienci(db)
+    
+    # Renderowanie szablonu HTML z przekazaniem danych
     return templates.TemplateResponse("index.html", {
-        "request": request, 
+        "request": request,  # Wymagane przez Jinja2
         "notatki": notatki,
         "klienci": klienci
     })
 
-@app.post("/notatka/add")
-def add_notatka(
-    typ_notatki: str = Form(...),
-    tresc: str = Form(...),
-    nr_rejestracyjny: str = Form(None),
-    db: Session = Depends(get_db)
-):
-    if typ_notatki == "szybka":
-        crud.create_notatka_szybka(db, tresc)
-    elif typ_notatki == "pojazd" and nr_rejestracyjny:
-        samochod = crud.get_samochod_by_rejestracja(db, nr_rejestracyjny)
-        if samochod:
-            crud.create_notatka_samochod(db, samochod.id, tresc)
-        else:
-            # Spróbuj pobrać z zewnętrznej bazy
-            samochod_zewn = crud.get_samochod_zewnetrzny(nr_rejestracyjny)
-            if samochod_zewn:
-                crud.create_notatka_szybka(db, f"Pojazd {nr_rejestracyjny}: {tresc}")
-            else:
-                crud.create_notatka_szybka(db, f"Nieznany pojazd {nr_rejestracyjny}: {tresc}")
-    
-    return RedirectResponse(url="/", status_code=303)
-
 @app.get("/klient/{klient_id}", response_class=HTMLResponse)
 def klient_detail(klient_id: int, request: Request, db: Session = Depends(get_db)):
+    """STRONA KLIENTA - Szczegóły klienta, jego samochody, notatki i kosztorysy"""
+    
     klient = crud.get_klient(db, klient_id)
     samochody = crud.get_samochody_klienta(db, klient_id)
+    kosztorysy = crud.get_kosztorysy_z_towarami_dla_klienta(db, klient_id)
     
-    # Pobierz kosztorysy klienta
-    kosztorysy = crud.get_kosztorysy_z_towarami_dla_klienta(db, klient_id)  # POPRAWIONE: Użyj funkcji z towarami
-    
-    # Pobierz notatki dla wszystkich samochodów klienta
+    # Zbieranie wszystkich notatek ze wszystkich samochodów klienta
     wszystkie_notatki = []
     for samochod in samochody:
         notatki_samochodu = crud.get_notatki_samochodu(db, samochod.id)
         wszystkie_notatki.extend(notatki_samochodu)
     
-    # Sortuj notatki po dacie
+    # Sortowanie notatek od najnowszych
     wszystkie_notatki.sort(key=lambda x: x.created_at, reverse=True)
     
     return templates.TemplateResponse("klient.html", {
@@ -74,14 +59,14 @@ def klient_detail(klient_id: int, request: Request, db: Session = Depends(get_db
         "kosztorysy": kosztorysy
     })
 
-# NOWY ENDPOINT: Strona kosztorysów
 @app.get("/kosztorysy/{nr_rejestracyjny}", response_class=HTMLResponse)
 def kosztorysy_page(nr_rejestracyjny: str, request: Request, db: Session = Depends(get_db)):
-    """Strona z kosztorysami dla konkretnego pojazdu"""
+    """STRONA KOSZTORYSÓW - Kosztorysy właściciela pojazdu o danym numerze rejestracyjnym"""
     
+    # Sprawdzenie czy pojazd istnieje w głównej bazie
     samochod = crud.get_samochod_by_rejestracja(db, nr_rejestracyjny)
     if not samochod:
-        # POPRAWIONE: Zwróć prostą stronę błędu zamiast template
+        # Zwracanie prostego HTML z błędem jeśli pojazd nie znaleziony
         return HTMLResponse(f"""
         <html><body>
             <h1>Błąd</h1>
@@ -90,7 +75,7 @@ def kosztorysy_page(nr_rejestracyjny: str, request: Request, db: Session = Depen
         </body></html>
         """, status_code=404)
     
-    # Przygotuj dane pojazdu
+    # Przygotowanie danych pojazdu dla szablonu
     pojazd_data = {
         "nr_rejestracyjny": samochod.nr_rejestracyjny,
         "marka": samochod.marka,
@@ -99,7 +84,7 @@ def kosztorysy_page(nr_rejestracyjny: str, request: Request, db: Session = Depen
         "wlasciciel": f"{samochod.klient.imie} {samochod.klient.nazwisko}" if samochod.klient else "Nieznany"
     }
     
-    # Pobierz kosztorysy z towarami
+    # Pobieranie kosztorysów właściciela pojazdu
     kosztorysy_z_towarami = crud.get_kosztorysy_z_towarami_dla_samochodu(db, nr_rejestracyjny)
     
     return templates.TemplateResponse("kosztorys.html", {
@@ -108,16 +93,53 @@ def kosztorysy_page(nr_rejestracyjny: str, request: Request, db: Session = Depen
         "kosztorysy": kosztorysy_z_towarami
     })
 
+# === AKCJE FORMULARZY (POST ENDPOINTS) ===
+
+@app.post("/notatka/add")
+def add_notatka(
+    typ_notatki: str = Form(...),  # Form(...) = wymagane pole formularza
+    tresc: str = Form(...),
+    nr_rejestracyjny: str = Form(None),  # Opcjonalne dla notatek szybkich
+    db: Session = Depends(get_db)
+):
+    """DODAWANIE NOTATKI - Obsługuje zarówno notatki szybkie jak i do pojazdów"""
+    
+    if typ_notatki == "szybka":
+        # Notatka ogólna, nie przypisana do pojazdu
+        crud.create_notatka_szybka(db, tresc)
+        
+    elif typ_notatki == "pojazd" and nr_rejestracyjny:
+        # Próba znalezienia pojazdu w głównej bazie
+        samochod = crud.get_samochod_by_rejestracja(db, nr_rejestracyjny)
+        
+        if samochod:
+            # Pojazd znaleziony - tworzy notatkę przypisaną do pojazdu
+            crud.create_notatka_samochod(db, samochod.id, tresc)
+        else:
+            # Pojazd nie znaleziony - sprawdza zewnętrzną bazę
+            samochod_zewn = crud.get_samochod_zewnetrzny(nr_rejestracyjny)
+            if samochod_zewn:
+                # Pojazd istnieje w zewnętrznej bazie - tworzy notatkę szybką z prefiksem
+                crud.create_notatka_szybka(db, f"Pojazd {nr_rejestracyjny}: {tresc}")
+            else:
+                # Pojazd nie istnieje nigdzie - tworzy notatkę z oznaczeniem nieznany
+                crud.create_notatka_szybka(db, f"Nieznany pojazd {nr_rejestracyjny}: {tresc}")
+    
+    # Przekierowanie z powrotem na stronę główną (pattern Post-Redirect-Get)
+    return RedirectResponse(url="/", status_code=303)
+
 @app.post("/samochod/add/{klient_id}")
 def add_samochod(
-    klient_id: int,
+    klient_id: int,  # Z URL path
     nr_rejestracyjny: str = Form(...),
     marka: str = Form(...),
     model: str = Form(...),
-    rok_produkcji: int = Form(None),
+    rok_produkcji: int = Form(None),  # Opcjonalne
     db: Session = Depends(get_db)
 ):
+    """DODAWANIE SAMOCHODU - Dodaje nowy pojazd do klienta"""
     crud.create_samochod(db, klient_id, nr_rejestracyjny, marka, model, rok_produkcji)
+    # Przekierowanie z powrotem do strony klienta
     return RedirectResponse(url=f"/klient/{klient_id}", status_code=303)
 
 @app.post("/notatka/szybka/{klient_id}")
@@ -126,6 +148,7 @@ def add_notatka_szybka(
     tresc: str = Form(...),
     db: Session = Depends(get_db)
 ):
+    """SZYBKA NOTATKA - Dodaje notatkę ogólną ze strony klienta"""
     crud.create_notatka_szybka(db, tresc)
     return RedirectResponse(url=f"/klient/{klient_id}", status_code=303)
 
@@ -135,13 +158,15 @@ def add_notatka_samochod(
     tresc: str = Form(...),
     db: Session = Depends(get_db)
 ):
+    """NOTATKA DO SAMOCHODU - Dodaje notatkę przypisaną do konkretnego pojazdu"""
     crud.create_notatka_samochod(db, samochod_id, tresc)
     
-    # POPRAWIONE: Użyj poprawnego importu
+    # Znajdź samochód żeby przekierować do właściwego klienta
     samochod = db.query(Samochod).filter(Samochod.id == samochod_id).first()
     if samochod and samochod.klient_id:
         return RedirectResponse(url=f"/klient/{samochod.klient_id}", status_code=303)
     else:
+        # Fallback na stronę główną jeśli nie ma przypisanego klienta
         return RedirectResponse(url="/", status_code=303)
 
 @app.post("/kosztorys/add/{klient_id}")
@@ -149,27 +174,36 @@ def add_kosztorys(
     klient_id: int,
     numer_kosztorysu: str = Form(...),
     kwota: float = Form(...),
-    opis: str = Form(None),
+    opis: str = Form(None),  # Opcjonalne
     db: Session = Depends(get_db)
 ):
+    """DODAWANIE KOSZTORYSU - Tworzy nowy kosztorys dla klienta"""
     crud.create_kosztorys(db, klient_id, kwota, opis, numer_kosztorysu)
     return RedirectResponse(url=f"/klient/{klient_id}", status_code=303)
 
+# === WYSZUKIWANIE ===
+
 @app.get("/notatka/nr_rej")
 def search_by_registration(nr_rejestracyjny: str, db: Session = Depends(get_db)):
+    """WYSZUKIWANIE - Przekierowuje do klienta na podstawie numeru rejestracyjnego"""
     samochod = crud.get_samochod_by_rejestracja(db, nr_rejestracyjny)
     if samochod:
         return RedirectResponse(url=f"/klient/{samochod.klient_id}", status_code=303)
     else:
+        # Zwracanie JSON przy braku wyników
         return {"message": "Nie znaleziono samochodu"}
+
+# === API ENDPOINTS (JSON) ===
 
 @app.delete("/notatka/delete/{notatka_id}")
 def delete_notatka(notatka_id: int, db: Session = Depends(get_db)):
+    """API - Usuwa notatkę (używane przez JavaScript)"""
     crud.delete_notatka(db, notatka_id)
     return {"success": True}
 
 @app.get("/api/notatka/{notatka_id}")
 def get_notatka_api(notatka_id: int, db: Session = Depends(get_db)):
+    """API - Pobiera szczegóły notatki (dla edycji w JavaScript)"""
     notatka = db.query(Notatka).filter(Notatka.id == notatka_id).first()
     if not notatka:
         return {"error": "Notatka nie znaleziona"}
@@ -177,7 +211,8 @@ def get_notatka_api(notatka_id: int, db: Session = Depends(get_db)):
 
 @app.put("/notatka/edit/{notatka_id}")
 async def edit_notatka(notatka_id: int, request: Request, db: Session = Depends(get_db)):
-    data = await request.json()
+    """API - Edytuje notatkę (przyjmuje JSON z JavaScript)"""
+    data = await request.json()  # Parsowanie JSON body
     notatka = db.query(Notatka).filter(Notatka.id == notatka_id).first()
     if not notatka:
         return {"error": "Notatka nie znaleziona"}
@@ -188,92 +223,21 @@ async def edit_notatka(notatka_id: int, request: Request, db: Session = Depends(
 
 @app.get("/api/pojazd-info/{nr_rejestracyjny}")
 def get_pojazd_info_endpoint(nr_rejestracyjny: str, db: Session = Depends(get_db)):
+    """API - Pobiera kompletne informacje o pojeździe (dla JavaScript preview)"""
     pojazd_info = crud.get_pojazd_info(db, nr_rejestracyjny)
     if not pojazd_info:
         return {"error": "Pojazd nie znaleziony"}
     return pojazd_info
 
-# === API ENDPOINTS ===
-@app.get("/api/przypomnienia-dzisiaj")
-def get_przypomnienia_dzisiaj_api(db: Session = Depends(get_db)):
-    przypomnienia = crud.get_przypomnienia_dzisiaj(db)
-    result = []
-    
-    for p in przypomnienia:
-        klient_info = None
-        if p.notatka.samochod and p.notatka.samochod.klient:
-            klient = p.notatka.samochod.klient
-            klient_info = f"{klient.imie} {klient.nazwisko}"
-        
-        result.append({
-            "id": p.id,
-            "godzina": p.data_przypomnienia.strftime('%H:%M'),
-            "notatka_tresc": p.notatka.tresc[:100] + "..." if len(p.notatka.tresc) > 100 else p.notatka.tresc,
-            "klient": klient_info
-        })
-    
-    return result
-
-@app.get("/api/przypomnienia-aktywne")
-def get_przypomnienia_aktywne(db: Session = Depends(get_db)):
-    now = datetime.now()
-    start_time = now - timedelta(minutes=5)
-    
-    przypomnienia = db.query(Przypomnienie).join(Notatka).filter(
-        and_(
-            Przypomnienie.data_przypomnienia >= start_time,
-            Przypomnienie.data_przypomnienia <= now,
-            Przypomnienie.wyslane == 0
-        )
-    ).all()
-    
-    # Oznacz jako wysłane
-    for p in przypomnienia:
-        p.wyslane = 1
-    db.commit()
-    
-    return [
-        {
-            "id": p.id,
-            "godzina": p.data_przypomnienia.strftime('%H:%M'),
-            "notatka_tresc": p.notatka.tresc[:100] + "..." if len(p.notatka.tresc) > 100 else p.notatka.tresc
-        }
-        for p in przypomnienia
-    ]
-
 @app.get("/api/notatki")
 def get_notatki_api(db: Session = Depends(get_db)):
+    """API - Lista notatek dla dropdown (skrócone)"""
     notatki = crud.get_wszystkie_notatki(db)
     return [{"id": n.id, "tresc": n.tresc[:50] + "..." if len(n.tresc) > 50 else n.tresc} for n in notatki]
 
-# === PRZYPOMNIENIA ===
-@app.post("/przypomnienie/add")
-def add_przypomnienie(
-    notatka_id: int = Form(...),
-    data_przypomnienia: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    try:
-        data = datetime.fromisoformat(data_przypomnienia)
-        crud.create_przypomnienie(db, notatka_id, data)
-        return RedirectResponse(url="/", status_code=303)
-    except ValueError:
-        return RedirectResponse(url="/?error=invalid_date", status_code=303)
-
-@app.post("/przypomnienie/mark/{przypomnienie_id}")
-def mark_przypomnienie(przypomnienie_id: int, db: Session = Depends(get_db)):
-    crud.mark_przypomnienie_wyslane(db, przypomnienie_id)
-    return {"success": True}
-
-@app.delete("/przypomnienie/delete/{przypomnienie_id}")
-def delete_przypomnienie_endpoint(przypomnienie_id: int, db: Session = Depends(get_db)):
-    crud.delete_przypomnienie(db, przypomnienie_id)
-    return {"success": True}
-
-# === API ENDPOINTS - CLEANED UP ===
 @app.get("/api/samochody/{klient_id}")
 def get_samochody_klienta_api(klient_id: int, db: Session = Depends(get_db)):
-    """API do pobierania samochodów klienta"""
+    """API - Samochody klienta (dla JavaScript)"""
     samochody = crud.get_samochody_klienta(db, klient_id)
     return [
         {
@@ -288,7 +252,7 @@ def get_samochody_klienta_api(klient_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/notatki/samochod/{samochod_id}")
 def get_notatki_samochodu_api(samochod_id: int, db: Session = Depends(get_db)):
-    """API do pobierania notatek samochodu"""
+    """API - Notatki konkretnego samochodu"""
     notatki = crud.get_notatki_samochodu(db, samochod_id)
     return [
         {
@@ -300,23 +264,27 @@ def get_notatki_samochodu_api(samochod_id: int, db: Session = Depends(get_db)):
         for n in notatki
     ]
 
-# USUNIĘTO DUPLIKATY - zostaje tylko jeden endpoint dla kosztorysów
 @app.get("/api/kosztorysy-z-towarami/{klient_id}")
 def get_kosztorysy_klienta_z_towarami_api(klient_id: int, db: Session = Depends(get_db)):
-    """API endpoint dla kosztorysów z towarami"""
+    """API - Kosztorysy klienta z towarami (JSON)"""
     kosztorysy = crud.get_kosztorysy_z_towarami_dla_klienta(db, klient_id)
     return kosztorysy
 
+# === NAWIGACJA/PRZEKIEROWANIA ===
+
 @app.get("/notatka/{notatka_id}/kosztorysy")
 def notatka_to_kosztorysy(notatka_id: int, db: Session = Depends(get_db)):
-    """Przekierowanie z notatki do kosztorysów pojazdu"""
+    """NAWIGACJA - Przechodzi z notatki do kosztorysów pojazdu"""
     notatka = db.query(Notatka).filter(Notatka.id == notatka_id).first()
 
     if not notatka or not notatka.samochod:
+        # Błąd jeśli notatka nie ma przypisanego samochodu
         return RedirectResponse(url="/?error=no_vehicle", status_code=303)
 
+    # Przekierowanie do kosztorysów pojazdu
     return RedirectResponse(url=f"/kosztorysy/{notatka.samochod.nr_rejestracyjny}", status_code=303)
 
+# === URUCHOMIENIE SERWERA ===
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)  # Serwer dostępny z każdego IP na porcie 8000

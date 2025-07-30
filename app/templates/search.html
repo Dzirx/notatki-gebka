@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Wyszukiwarka - Notatnik Warsztatowy</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}">
+    <style>
+        .search-container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .search-input {
+            width: 100%;
+            max-width: 500px;
+            padding: 15px 20px;
+            font-size: 18px;
+            border: 2px solid #007bff;
+            border-radius: 25px;
+            outline: none;
+            margin: 20px 0;
+        }
+        
+        .search-input:focus {
+            border-color: #0056b3;
+            box-shadow: 0 0 10px rgba(0,123,255,0.3);
+        }
+        
+        .search-filters {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .filter-btn {
+            padding: 8px 16px;
+            border: 1px solid #dee2e6;
+            background: white;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .filter-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        
+        .results-container {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .results-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #dee2e6;
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .result-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e9ecef;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .result-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        
+        .result-type {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .type-klient { background: #d4edda; color: #155724; }
+        .type-samochod { background: #d1ecf1; color: #0c5460; }
+        .type-notatka { background: #fff3cd; color: #856404; }
+        
+        .result-title {
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 5px;
+        }
+        
+        .result-description {
+            color: #6c757d;
+            font-size: 14px;
+        }
+        
+        .empty-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6c757d;
+            font-style: italic;
+        }
+        
+        .quick-actions {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .quick-actions h4 {
+            margin: 0 0 15px 0;
+            color: #495057;
+        }
+        
+        .quick-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 5px;
+            background: #17a2b8;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: background 0.3s;
+        }
+        
+        .quick-btn:hover {
+            background: #138496;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🔍 Wyszukiwarka</h1>
+            <a href="/home" class="btn-secondary">← Powrót</a>
+        </div>
+        
+        <!-- Wyszukiwanie -->
+        <div class="search-container">
+            <h2>Znajdź klientów, pojazdy lub notatki</h2>
+            <input type="text" id="searchInput" class="search-input" placeholder="Wpisz nazwę, numer rejestracyjny lub treść notatki...">
+            
+            <div class="search-filters">
+                <button class="filter-btn active" data-type="all">Wszystko</button>
+                <button class="filter-btn" data-type="klienci">👤 Klienci</button>
+                <button class="filter-btn" data-type="samochody">🚗 Pojazdy</button>
+                <button class="filter-btn" data-type="notatki">📝 Notatki</button>
+            </div>
+        </div>
+        
+        <!-- Wyniki -->
+        <div id="resultsSection" style="display: none;">
+            <div class="results-container">
+                <div class="results-header">
+                    <span id="resultsCount">0 wyników</span>
+                </div>
+                <div id="resultsContent">
+                    <!-- Wyniki będą tu -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Szybkie akcje -->
+        <div class="quick-actions">
+            <h4>⚡ Szybkie akcje</h4>
+            <a href="/home" class="quick-btn">📝 Wszystkie notatki</a>
+            <a href="#" class="quick-btn" onclick="showAddKlient()">👤 Dodaj klienta</a>
+            <a href="#" class="quick-btn" onclick="showAddNote()">📝 Dodaj notatkę</a>
+        </div>
+
+        <!-- Modal: Dodaj klienta -->
+        <div id="addKlientModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeAddKlient()">&times;</span>
+                <h3>Dodaj nowego klienta</h3>
+                <form action="/klient/add" method="post">
+                    <div class="form-group">
+                        <input type="text" name="nazwapelna" placeholder="Imię i nazwisko / Nazwa firmy" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="tel" name="nr_telefonu" placeholder="Numer telefonu">
+                    </div>
+                    <div class="form-group">
+                        <input type="text" name="nip" placeholder="NIP (opcjonalnie)">
+                    </div>
+                    <div class="form-group">
+                        <input type="text" name="nazwa_firmy" placeholder="Nazwa firmy (opcjonalnie)">
+                    </div>
+                    <button type="submit" class="btn-primary">Dodaj klienta</button>
+                    <button type="button" class="btn-secondary" onclick="closeAddKlient()">Anuluj</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSearchType = 'all';
+        let searchTimeout;
+
+        // Inicjalizacja
+        document.addEventListener('DOMContentLoaded', function() {
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            // Wyszukiwanie z debounce
+            document.getElementById('searchInput').addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    performSearch();
+                }, 300);
+            });
+
+            // Filtry
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // Usuń aktywną klasę z wszystkich
+                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    // Dodaj do klikniętego
+                    this.classList.add('active');
+                    currentSearchType = this.dataset.type;
+                    performSearch();
+                });
+            });
+        }
+
+        function performSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            
+            if (query.length < 2) {
+                hideResults();
+                return;
+            }
+
+            // Pokaż loading
+            showResults([]);
+            document.getElementById('resultsCount').textContent = 'Wyszukiwanie...';
+
+            fetch(`/api/search?q=${encodeURIComponent(query)}&type=${currentSearchType}`)
+                .then(response => response.json())
+                .then(data => {
+                    displayResults(data.results, query);
+                })
+                .catch(error => {
+                    console.error('Błąd wyszukiwania:', error);
+                    document.getElementById('resultsCount').textContent = 'Błąd wyszukiwania';
+                });
+        }
+
+        function displayResults(results, query) {
+            const resultsContent = document.getElementById('resultsContent');
+            const resultsCount = document.getElementById('resultsCount');
+
+            if (results.length === 0) {
+                resultsCount.textContent = 'Brak wyników';
+                resultsContent.innerHTML = `
+                    <div class="empty-results">
+                        <h3>🔍 Brak wyników dla "${query}"</h3>
+                        <p>Spróbuj użyć innych słów kluczowych lub sprawdź wszystkie kategorie.</p>
+                    </div>
+                `;
+            } else {
+                resultsCount.textContent = `${results.length} wyników dla "${query}"`;
+                resultsContent.innerHTML = results.map(result => `
+                    <div class="result-item" onclick="window.location.href='${result.url}'">
+                        <span class="result-type type-${result.type}">
+                            ${getTypeLabel(result.type)}
+                        </span>
+                        <div class="result-title">${highlightText(result.nazwa, query)}</div>
+                        <div class="result-description">
+                            ${getResultDescription(result)}
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            showResults(results);
+        }
+
+        function getTypeLabel(type) {
+            switch(type) {
+                case 'klient': return '👤 KLIENT';
+                case 'samochod': return '🚗 POJAZD';
+                case 'notatka': return '📝 NOTATKA';
+                default: return type.toUpperCase();
+            }
+        }
+
+        function getResultDescription(result) {
+            switch(result.type) {
+                case 'klient':
+                    return 'Przejdź do szczegółów klienta';
+                case 'samochod':
+                    return 'Zobacz pojazd i kosztorysy właściciela';
+                case 'notatka':
+                    return 'Otwórz notatkę';
+                default:
+                    return '';
+            }
+        }
+
+        function highlightText(text, query) {
+            if (!query) return text;
+            const regex = new RegExp(`(${query})`, 'gi');
+            return text.replace(regex, '<strong style="background: #ffeb3b;">$1</strong>');
+        }
+
+        function showResults(results) {
+            document.getElementById('resultsSection').style.display = 'block';
+        }
+
+        function hideResults() {
+            document.getElementById('resultsSection').style.display = 'none';
+        }
+
+        // Modale
+        function showAddKlient() {
+            document.getElementById('addKlientModal').style.display = 'block';
+        }
+
+        function closeAddKlient() {
+            document.getElementById('addKlientModal').style.display = 'none';
+        }
+
+        function showAddNote() {
+            window.location.href = '/home';
+        }
+
+        // Zamykanie modali kliknięciem tła
+        window.addEventListener('click', function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        });
+
+        // Wyszukiwanie po Enter
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+    </script>
+</body>
+</html>

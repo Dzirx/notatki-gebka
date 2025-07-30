@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Samochód - {{ pojazd.nr_rejestracyjny }}</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}">
+    <style>
+        .header-card {
+            background: white; 
+            border-radius: 8px; 
+            padding: 20px; 
+            margin-bottom: 20px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #007bff;
+        }
+        
+        .pojazd-info {
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+        }
+        
+        .pojazd-details h2 {
+            margin: 0 0 10px 0; 
+            color: #007bff;
+        }
+        
+        .pojazd-details p {
+            margin: 5px 0; 
+            color: #6c757d;
+        }
+        
+        .back-button {
+            padding: 10px 20px; 
+            background: #6c757d; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .back-button:hover {
+            background: #5a6268;
+        }
+        
+        .kosztorys-card {
+            background: white; 
+            border-radius: 8px; 
+            margin: 20px 0; 
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border: 1px solid #dee2e6;
+        }
+        
+        .kosztorys-header {
+            background: #f8f9fa; 
+            padding: 15px; 
+            border-bottom: 1px solid #dee2e6;
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+        }
+        
+        .kosztorys-number {
+            color: #28a745; 
+            font-size: 18px; 
+            font-weight: bold;
+        }
+        
+        .kosztorys-opis {
+            color: #6c757d; 
+            font-size: 14px; 
+            margin-top: 3px;
+        }
+        
+        .kosztorys-kwota {
+            font-weight: bold; 
+            color: #dc3545; 
+            font-size: 20px;
+        }
+        
+        .status-badge {
+            font-size: 10px; 
+            padding: 4px 8px; 
+            border-radius: 12px; 
+            margin-top: 5px;
+            display: inline-block;
+        }
+        
+        .status-draft { background: #fff3cd; color: #856404; }
+        .status-approved { background: #d4edda; color: #155724; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+        
+        .pozycje-table {
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 0;
+        }
+        
+        .pozycje-table th {
+            background: #495057; 
+            color: white; 
+            padding: 12px; 
+            font-size: 12px; 
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        .pozycje-table td {
+            padding: 10px 12px; 
+            font-size: 13px; 
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .pozycje-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .center { text-align: center; }
+        .right { text-align: right; }
+        
+        .notatki-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .notatka-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .notatka-data {
+            font-size: 12px;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header z informacjami o pojeździe -->
+        <div class="header-card">
+            <div class="pojazd-info">
+                <div class="pojazd-details">
+                    <h2>🚗 {{ pojazd.marka }} {{ pojazd.model }} ({{ pojazd.rok_produkcji }})</h2>
+                    <p><strong>Właściciel:</strong> {{ pojazd.wlasciciel }}</p>
+                    <p><strong>Nr rejestracyjny:</strong> {{ pojazd.nr_rejestracyjny }}</p>
+                </div>
+                <div>
+                    <a href="/home" class="back-button">← Powrót</a>
+                </div>
+            </div>
+        </div>
+                
+        <!-- Kosztorysy -->
+        <h3>💰 Notatki z kosztorysami</h3>
+        {% if notatki_z_kosztorysami %}
+            {% for item in notatki_z_kosztorysami %}
+                <h4>📝 {{ item.notatka.tresc }}</h4>
+                {% for kosztorys in item.kosztorysy %}
+            <div class="kosztorys-card">
+                <!-- Header kosztorysu -->
+                <div class="kosztorys-header">
+                    <div>
+                        <div class="kosztorys-number">📋 {{ kosztorys.numer }}</div>
+                        <div class="kosztorys-opis">{{ kosztorys.opis }}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="kosztorys-kwota">{{ "%.2f"|format(kosztorys.kwota_calkowita) }} zł</div>
+                        <div class="status-badge status-{{ kosztorys.status }}">
+                            {% if kosztorys.status == 'draft' %}SZKIC
+                            {% elif kosztorys.status == 'approved' %}ZATWIERDZONY
+                            {% elif kosztorys.status == 'rejected' %}ODRZUCONY
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Towary i usługi -->
+                {% if kosztorys.towary or kosztorys.uslugi %}
+                <table class="pozycje-table">
+                    <thead>
+                        <tr>
+                            <th>Typ</th>
+                            <th>Nazwa</th>
+                            <th class="center">Ilość</th>
+                            <th class="right">Cena</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for towar in kosztorys.towary %}
+                        <tr>
+                            <td>📦 Towar</td>
+                            <td>{{ towar.nazwa }}</td>
+                            <td class="center">{{ towar.ilosc }}</td>
+                            <td class="right">{{ "%.2f"|format(towar.cena) }} zł</td>
+                        </tr>
+                        {% endfor %}
+                        
+                        {% for usluga in kosztorys.uslugi %}
+                        <tr>
+                            <td>🔧 Usługa</td>
+                            <td>{{ usluga.nazwa }}</td>
+                            <td class="center">{{ usluga.ilosc }}</td>
+                            <td class="right">{{ "%.2f"|format(usluga.cena) }} zł</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div style="padding: 20px; text-align: center; color: #6c757d; font-style: italic;">
+                    Brak pozycji w kosztorysie
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% endfor %}
+        {% else %}
+        <div style="background: white; padding: 30px; text-align: center; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <h3>Brak kosztorysów</h3>
+            <p>Dla właściciela tego pojazdu nie ma jeszcze żadnych kosztorysów.</p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

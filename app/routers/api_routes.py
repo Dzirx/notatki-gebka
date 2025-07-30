@@ -1,26 +1,10 @@
-# === ROUTERS/API_ROUTES.PY - ENDPOINTY API (JSON) ===
 from fastapi import APIRouter, Depends, Request, HTTPException
-from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 import crud
 from database import get_db
-from models import Notatka
+from models import Notatka, Samochod
 
 router = APIRouter()
-
-# === NOTATKI API ===
-
-@router.get("/notatki")
-def get_notatki_api(db: Session = Depends(get_db)):
-    """Lista notatek dla dropdown"""
-    notatki = crud.get_wszystkie_notatki(db)
-    return [
-        {
-            "id": n.id, 
-            "tresc": n.tresc[:50] + "..." if len(n.tresc) > 50 else n.tresc
-        } 
-        for n in notatki
-    ]
 
 @router.get("/notatka/{notatka_id}")
 def get_notatka_api(notatka_id: int, db: Session = Depends(get_db)):
@@ -57,54 +41,37 @@ def delete_notatka(notatka_id: int, db: Session = Depends(get_db)):
     else:
         raise HTTPException(status_code=404, detail="Notatka nie znaleziona")
 
-# === POJAZDY API ===
-
 @router.get("/pojazd/{nr_rejestracyjny}")
 def get_pojazd_info_api(nr_rejestracyjny: str, db: Session = Depends(get_db)):
     """Kompletne informacje o pojeździe"""
-    pojazd_info = crud.get_pojazd_info(db, nr_rejestracyjny)
-    if not pojazd_info:
+    samochod = db.query(Samochod).options(
+        joinedload(Samochod.klient)
+    ).filter(Samochod.nr_rejestracyjny == nr_rejestracyjny).first()
+    
+    if not samochod:
         raise HTTPException(status_code=404, detail="Pojazd nie znaleziony")
-    return pojazd_info
-
-@router.get("/samochody/{klient_id}")
-def get_samochody_klienta_api(klient_id: int, db: Session = Depends(get_db)):
-    """Samochody klienta"""
-    samochody = crud.get_samochody_klienta(db, klient_id)
-    return [
-        {
-            "id": s.id,
-            "nr_rejestracyjny": s.nr_rejestracyjny,
-            "marka": s.marka,
-            "model": s.model,
-            "rok_produkcji": s.rok_produkcji
-        }
-        for s in samochody
-    ]
-
-@router.get("/notatki/samochod/{samochod_id}")
-def get_notatki_samochodu_api(samochod_id: int, db: Session = Depends(get_db)):
-    """Notatki konkretnego samochodu"""
-    notatki = crud.get_notatki_samochodu(db, samochod_id)
-    return [
-        {
+    
+    wlasciciel = samochod.klient.nazwapelna if samochod.klient else "Nieznany"
+    notatki = crud.get_notatki_samochodu(db, samochod.id)
+    
+    notatki_lista = []
+    for n in notatki:
+        kosztorysy = crud.get_kosztorysy_z_towarami_dla_notatki(db, n.id)
+        notatki_lista.append({
             "id": n.id,
             "tresc": n.tresc,
-            "typ_notatki": n.typ_notatki,
-            "created_at": n.created_at.strftime('%d.%m.%Y %H:%M')
-        }
-        for n in notatki
-    ]
-
-# === KOSZTORYSY API ===
-
-@router.get("/kosztorysy/notatka/{notatka_id}")
-def get_kosztorysy_notatki_api(notatka_id: int, db: Session = Depends(get_db)):
-    """Kosztorysy notatki z towarami i usługami"""
-    kosztorysy = crud.get_kosztorysy_z_towarami_dla_notatki(db, notatka_id)
-    return kosztorysy
-
-# === TOWARY/USŁUGI API ===
+            "data": n.created_at.strftime('%d.%m.%Y %H:%M'),
+            "kosztorysy": kosztorysy
+        })
+    
+    return {
+        "nr_rejestracyjny": samochod.nr_rejestracyjny,
+        "marka": samochod.marka,
+        "model": samochod.model,
+        "rok_produkcji": samochod.rok_produkcji,
+        "wlasciciel": wlasciciel,
+        "notatki": notatki_lista
+    }
 
 @router.get("/towary")
 def get_towary_api(db: Session = Depends(get_db)):
@@ -131,8 +98,6 @@ def get_uslugi_api(db: Session = Depends(get_db)):
         }
         for u in uslugi
     ]
-
-# === WYSZUKIWANIE API ===
 
 @router.get("/search")
 def search_api(
@@ -163,7 +128,7 @@ def search_api(
     if type in ["all", "notatki"]:
         notatki = crud.search_notatki(db, q)
         results.extend([
-            {"type": "notatka", "id": n.id, "nazwa": n.tresc[:50] + "...", "url": f"/notatka/{n.id}"}
+            {"type": "notatka", "id": n.id, "nazwa": n.tresc[:50] + "...", "url": f"/kosztorys/detail/{n.id}"}
             for n in notatki
         ])
     

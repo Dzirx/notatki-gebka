@@ -9,7 +9,7 @@ from models import Notatka, Samochod, Kosztorys
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
-@router.get("/home", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)):
     """STRONA GŁÓWNA - Lista wszystkich notatek"""
     
@@ -18,7 +18,7 @@ def home(request: Request, db: Session = Depends(get_db)):
         joinedload(Notatka.kosztorysy)
     ).order_by(Notatka.created_at.desc()).all()
     
-    return templates.TemplateResponse("index.html", {
+    return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "notatki": notatki
     })

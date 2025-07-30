@@ -1,103 +1,4 @@
-/* GŁÓWNE STYLE APLIKACJI */
-body { 
-    font-family: Arial, sans-serif; 
-    margin: 20px; 
-    background: #f5f5f5; 
-}
-
-.container { 
-    max-width: 1200px; 
-    margin: 0 auto; 
-}
-
-/* FORMULARZE */
-.form-group { margin: 15px 0; }
-
-input, textarea, select { 
-    padding: 12px; 
-    margin: 5px; 
-    border: 1px solid #ddd; 
-    border-radius: 6px; 
-    font-size: 14px;
-}
-
-textarea { 
-    width: calc(100% - 24px); 
-    height: 120px; 
-    resize: vertical; 
-    box-sizing: border-box; 
-}
-
-/* PRZYCISKI */
-button { 
-    padding: 12px 24px; 
-    border: none; 
-    border-radius: 6px; 
-    cursor: pointer; 
-    font-size: 14px; 
-    transition: all 0.3s;
-}
-
-.btn-primary { background: #007bff; color: white; }
-.btn-primary:hover { background: #0056b3; }
-.btn-success { background: #28a745; color: white; }
-.btn-success:hover { background: #218838; }
-.btn-secondary { background: #6c757d; color: white; }
-.btn-secondary:hover { background: #5a6268; }
-.btn-warning { background: #ffc107; color: #212529; }
-.btn-warning:hover { background: #e0a800; }
-.btn-danger { background: #dc3545; color: white; }
-.btn-danger:hover { background: #c82333; }
-
-/* HEADER */
-.header { 
-    background: white; 
-    padding: 20px; 
-    border-radius: 8px; 
-    margin-bottom: 20px; 
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center;
-}
-
-.header h1 { margin: 0; }
-
-/* TABELE */
-table { 
-    width: 100%; 
-    border-collapse: collapse; 
-    margin: 20px 0; 
-    background: white; 
-    border-radius: 8px; 
-    overflow: hidden;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
-th, td { 
-    border: 1px solid #ddd; 
-    padding: 12px; 
-    text-align: left; 
-}
-
-th { 
-    background: #f8f9fa; 
-    font-weight: 600; 
-}
-
-/* NOTATKI */
-.notatka-pojazd { 
-    background: #d1ecf1; 
-    cursor: pointer; 
-}
-
-.notatka-pojazd:hover { 
-    background: #b8daff; 
-}
-
-.notatka-szybka { 
-    background: #fff3cd; 
-}
+/* === MODAL.CSS - MODALE I KOSZTORYSY === */
 
 /* MODALE */
 .modal { 
@@ -113,12 +14,14 @@ th {
 
 .modal-content { 
     background: white; 
-    margin: 5% auto; 
+    margin: 2% auto; 
     padding: 30px; 
-    width: 90%; 
-    max-width: 500px; 
+    width: 95%;
+    max-width: 900px;
     border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 .close { 
@@ -130,41 +33,11 @@ th {
     line-height: 1;
 }
 
-.close:hover { color: #000; }
-
-/* WYSZUKIWANIE */
-.search-rej {
-    display: flex; 
-    align-items: center; 
-    margin-bottom: 15px;
+.close:hover { 
+    color: #000; 
 }
 
-.search-rej input { 
-    flex: 1; 
-    margin-right: 10px; 
-}
-
-/* AKCJE */
-.actions-bar {
-    background: white; 
-    padding: 15px; 
-    border-radius: 8px; 
-    margin-bottom: 20px; 
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
-/* POMOCNICZE */
-.hidden { display: none !important; }
-
-.modal-content {
-    max-width: 900px !important;
-    width: 95%;
-    margin: 2% auto;
-    max-height: 90vh;
-    overflow-y: auto;
-}
-
-/* Kontener kosztorysu */
+/* KOSZTORYS CONTAINER */
 .kosztorys-container {
     border: 2px solid #007bff;
     border-radius: 12px;
@@ -195,7 +68,7 @@ th {
     border-radius: 20px;
 }
 
-/* Podstawowe informacje kosztorysu */
+/* PODSTAWOWE INFORMACJE KOSZTORYSU */
 .kosztorys-basic-info {
     padding: 15px 20px;
     background: white;
@@ -208,7 +81,7 @@ th {
     margin: 0;
 }
 
-/* Grid layout dla towarów i usług */
+/* GRID LAYOUT DLA TOWARÓW I USŁUG */
 .kosztorys-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -238,22 +111,7 @@ th {
     font-size: 14px;
 }
 
-.btn-load {
-    background: #17a2b8;
-    color: white;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-size: 11px;
-    cursor: pointer;
-    transition: background 0.3s;
-}
-
-.btn-load:hover {
-    background: #138496;
-}
-
-/* Kontener pozycji */
+/* KONTENER POZYCJI */
 .items-container {
     max-height: 300px;
     overflow-y: auto;
@@ -269,7 +127,7 @@ th {
     font-size: 13px;
 }
 
-/* Pojedyncza pozycja */
+/* POJEDYNCZA POZYCJA */
 .item-row {
     display: grid;
     grid-template-columns: 30px 1fr 80px 80px 80px;
@@ -327,7 +185,7 @@ th {
     text-align: right;
 }
 
-/* Footer kosztorysu */
+/* FOOTER KOSZTORYSU */
 .kosztorys-footer {
     background: #e9ecef;
     padding: 15px 20px;
@@ -363,48 +221,9 @@ th {
     border-top: 2px solid #007bff;
 }
 
-/* Checkbox label */
-.checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    font-weight: 500;
-    color: #495057;
-}
-
-.checkbox-label input[type="checkbox"] {
-    margin: 0 !important;
-    transform: scale(1.3);
-}
-
-/* Akcje formularza */
-.form-actions {
-    display: flex;
-    gap: 15px;
-    justify-content: center;
-    margin-top: 25px;
-    padding: 20px 0;
-    border-top: 2px solid #e9ecef;
-}
-
-.btn-large {
-    padding: 15px 30px;
-    font-size: 16px;
-    font-weight: 600;
-    border-radius: 8px;
-    min-width: 160px;
-    transition: all 0.3s;
-}
-
-.btn-large:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-}
-
-/* Responsywność */
+/* RESPONSYWNOŚĆ */
 @media (max-width: 768px) {
-    .modal-wide .modal-content {
+    .modal-content {
         width: 98%;
         margin: 1% auto;
     }

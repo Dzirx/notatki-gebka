@@ -1,0 +1,292 @@
+/* === MAGAZYN.CSS - STYLE MODUŁU MAGAZYN === */
+
+/* FORMULARZ WYSZUKIWANIA */
+.search-form-container {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.search-form-container h3 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+}
+
+.date-search-form {
+    display: flex;
+    align-items: end;
+    gap: 20px;
+    margin-bottom: 25px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #34495e;
+}
+
+.form-group input[type="date"] {
+    padding: 12px;
+    border: 2px solid #bdc3c7;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+}
+
+.form-group input[type="date"]:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+}
+
+/* SZYBKIE DATY */
+.quick-dates {
+    border-top: 1px solid #ecf0f1;
+    padding-top: 20px;
+}
+
+.quick-dates h4 {
+    color: #7f8c8d;
+    margin-bottom: 15px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.date-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.date-btn {
+    background: #ecf0f1;
+    color: #2c3e50;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.date-btn:hover {
+    background: #3498db;
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* WYNIKI */
+.results-container {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.results-container h3 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #e74c3c;
+    padding-bottom: 10px;
+}
+
+.stats-info {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #27ae60;
+}
+
+.stats-info p {
+    margin: 0;
+    color: #2c3e50;
+    font-weight: 500;
+}
+
+/* TABELA OPON */
+.table-responsive {
+    overflow-x: auto;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.opony-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    margin: 0;
+}
+
+.opony-table th {
+    background: #34495e;
+    color: white;
+    font-weight: 600;
+    padding: 15px 12px;
+    text-align: left;
+    border: none;
+}
+
+.opony-table td {
+    padding: 12px;
+    border-bottom: 1px solid #ecf0f1;
+    vertical-align: top;
+}
+
+.opony-table tr:hover {
+    background: #f8f9fa;
+}
+
+/* TYPY OPON */
+.opona-type {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.opona-zima {
+    background: #3498db;
+    color: white;
+}
+
+.opona-lato {
+    background: #e74c3c;
+    color: white;
+}
+
+.opona-calosezon {
+    background: #f39c12;
+    color: white;
+}
+
+/* NUMER KOSZTORYSU */
+.numer-kosztorysu {
+    background: #9b59b6;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* SZCZEGÓŁY TOWARÓW I USŁUG */
+.towary-cell, .uslugi-cell {
+    max-width: 250px;
+}
+
+details {
+    cursor: pointer;
+}
+
+summary {
+    background: #ecf0f1;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #2c3e50;
+    list-style: none;
+    transition: background 0.3s ease;
+}
+
+summary:hover {
+    background: #bdc3c7;
+}
+
+summary::-webkit-details-marker {
+    display: none;
+}
+
+summary::before {
+    content: "▶ ";
+    transition: transform 0.3s ease;
+}
+
+details[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.details-content {
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 0 0 4px 4px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #5a6c7d;
+    border-top: 1px solid #ecf0f1;
+}
+
+/* BRAK WYNIKÓW */
+.no-results {
+    text-align: center;
+    padding: 40px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 2px dashed #bdc3c7;
+}
+
+.no-results p {
+    margin: 10px 0;
+    color: #7f8c8d;
+}
+
+.no-results p:first-child {
+    font-size: 18px;
+    font-weight: 600;
+    color: #e74c3c;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+    .date-search-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .date-buttons {
+        justify-content: center;
+    }
+    
+    .opony-table {
+        font-size: 12px;
+    }
+    
+    .opony-table th,
+    .opony-table td {
+        padding: 8px 6px;
+    }
+    
+    .towary-cell, .uslugi-cell {
+        max-width: 150px;
+    }
+}
+
+@media (max-width: 480px) {
+    .search-form-container,
+    .results-container {
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .opony-table {
+        font-size: 11px;
+    }
+    
+    .details-content {
+        font-size: 10px;
+    }
+}

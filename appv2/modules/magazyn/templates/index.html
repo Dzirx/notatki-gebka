@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📦 Magazyn - Opony na dzień</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/components.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/tables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/modules/magazyn/static/css/magazyn.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <h1>📦 Magazyn - Opony</h1>
+            <div>
+                <a href="/" class="btn-secondary">← Dashboard</a>
+            </div>
+        </div>
+
+        <!-- FORMULARZ WYSZUKIWANIA -->
+        <div class="search-form-container">
+            <h3>🗓️ Wybierz datę</h3>
+            <form method="post" class="date-search-form">
+                <div class="form-group">
+                    <label for="selected_date">Data:</label>
+                    <input type="date" id="selected_date" name="selected_date" 
+                           value="{{ selected_date or dzisiejsza_data }}" required>
+                </div>
+                <button type="submit" class="btn-primary">🔍 Pokaż opony</button>
+            </form>
+            
+            <!-- SZYBKIE DATY -->
+            {% if dostepne_daty %}
+            <div class="quick-dates">
+                <h4>Ostatnie dostępne daty:</h4>
+                <div class="date-buttons">
+                    {% for data in dostepne_daty[:7] %}
+                    <form method="post" style="display: inline;">
+                        <input type="hidden" name="selected_date" value="{{ data }}">
+                        <button type="submit" class="btn-small date-btn">{{ data }}</button>
+                    </form>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- WYNIKI -->
+        {% if selected_date %}
+        <div class="results-container">
+            <h3>🚗 Opony na dzień: {{ selected_date }}</h3>
+            
+            {% if opony_data %}
+            <div class="stats-info">
+                <p><strong>Znaleziono:</strong> {{ opony_data|length }} rekordów</p>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="opony-table">
+                    <thead>
+                        <tr>
+                            <th>Nr Rejestracyjny</th>
+                            <th>Nazwa Opony</th>
+                            <th>Felgi/Opony</th>
+                            <th>Rodzaj</th>
+                            <th>Bieżnik</th>
+                            <th>Lokalizacja</th>
+                            <th>Nr Kosztorysu</th>
+                            <th>Towary</th>
+                            <th>Usługi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for opona in opony_data %}
+                        <tr>
+                            <td><strong>{{ opona.rej }}</strong></td>
+                            <td>{{ opona.name }}</td>
+                            <td>{{ opona.wheels }}</td>
+                            <td>
+                                <span class="opona-type opona-{{ opona.rodzaj_opony }}">
+                                    {{ opona.rodzaj_opony }}
+                                </span>
+                            </td>
+                            <td>{{ opona.bieznik }}</td>
+                            <td><code>{{ opona.lokalizacja }}</code></td>
+                            <td><span class="numer-kosztorysu">{{ opona.numer }}</span></td>
+                            <td class="towary-cell">
+                                {% if opona.towary_szczegoly %}
+                                    <details>
+                                        <summary>Pokaż towary</summary>
+                                        <div class="details-content">{{ opona.towary_szczegoly }}</div>
+                                    </details>
+                                {% else %}
+                                    <em>Brak</em>
+                                {% endif %}
+                            </td>
+                            <td class="uslugi-cell">
+                                {% if opona.uslugi_szczegoly %}
+                                    <details>
+                                        <summary>Pokaż usługi</summary>
+                                        <div class="details-content">{{ opona.uslugi_szczegoly }}</div>
+                                    </details>
+                                {% else %}
+                                    <em>Brak</em>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            {% else %}
+            <div class="no-results">
+                <p>❌ Brak opon na wybraną datę: <strong>{{ selected_date }}</strong></p>
+                <p>Spróbuj wybrać inną datę z listy dostępnych dat powyżej.</p>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="{{ url_for('static', path='/js/common.js') }}"></script>
+    <script src="{{ url_for('static', path='/modules/magazyn/static/js/magazyn.js') }}"></script>
+</body>
+</html>

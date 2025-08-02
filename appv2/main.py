@@ -5,7 +5,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 
 # Import modułów
-from modules.notatnik.routes import html_router, api_router, forms_router
+from modules.notatnik.routes import html_router as notatnik_html_router, api_router as notatnik_api_router, forms_router as notatnik_forms_router
+from modules.magazyn.routes import html_router as magazyn_html_router, api_router as magazyn_api_router
 
 # === KONFIGURACJA APLIKACJI ===
 app = FastAPI(title="System Warsztatowy", version="2.0.0")
@@ -45,21 +46,17 @@ async def dashboard(request: Request):
     })
 
 # === DODANIE ROUTERÓW MODUŁÓW ===
-app.include_router(html_router, prefix="/notatnik", tags=["Notatnik HTML"])
-app.include_router(api_router, prefix="/api", tags=["Notatnik API"])
-app.include_router(forms_router, prefix="/notatnik", tags=["Notatnik Forms"])
+
+# Notatnik
+app.include_router(notatnik_html_router, prefix="/notatnik", tags=["Notatnik HTML"])
+app.include_router(notatnik_api_router, prefix="/api", tags=["Notatnik API"])
+app.include_router(notatnik_forms_router, prefix="/notatnik", tags=["Notatnik Forms"])
+
+# Magazyn
+app.include_router(magazyn_html_router, prefix="/magazyn", tags=["Magazyn HTML"])
+app.include_router(magazyn_api_router, prefix="/api/magazyn", tags=["Magazyn API"])
 
 # === PLACEHOLDER ROUTES ===
-@app.get("/magazyn")
-async def magazyn_placeholder():
-    return HTMLResponse("""
-    <html><body style="font-family: Arial; text-align: center; padding: 100px;">
-        <h1>📦 Magazyn</h1>
-        <p>Moduł w budowie...</p>
-        <a href="/" style="color: #007bff;">← Powrót do dashboardu</a>
-    </body></html>
-    """)
-
 @app.get("/excel") 
 async def excel_placeholder():
     return HTMLResponse("""

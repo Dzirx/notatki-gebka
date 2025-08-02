@@ -1,0 +1,41 @@
+<!-- MODAL: DODAJ NOTATKĘ -->
+<div id="noteModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h3>Dodaj Notatkę</h3>
+        <form action="/notatnik/add" method="post">
+            <div class="form-group">
+                <label>Wybierz typ notatki:</label>
+                <div style="display: flex; gap: 10px; margin: 10px 0;">
+                    <button type="button" class="btn btn-secondary" data-type="szybka" onclick="selectNoteType('szybka')">
+                        ⚡ Szybka notatka
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-type="pojazd" onclick="selectNoteType('pojazd')">
+                        🚙 Notatka do pojazdu
+                    </button>
+                </div>
+                <input type="hidden" id="typ_notatki" name="typ_notatki" required>
+            </div>
+            
+            <div id="nr_rej_group" class="form-group hidden">
+                <label>Numer rejestracyjny pojazdu:</label>
+                <input type="text" id="nr_rejestracyjny" name="nr_rejestracyjny" placeholder="np. WAW12345">
+                <button type="button" class="btn btn-primary" onclick="pobierzInformacje()">📋 Pobierz informacje</button>
+            </div>
+            
+            <div id="pojazd_info" class="hidden" style="background: #e7f3ff; padding: 15px; margin: 10px 0; border-radius: 6px;">
+                <!-- Informacje o pojeździe będą tu -->
+            </div>
+            
+            <div class="form-group">
+                <label>Treść notatki:</label>
+                <textarea name="tresc" placeholder="Opisz wykonane prace, ustalone ustalenia lub uwagi..." required></textarea>
+            </div>
+            
+            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 25px;">
+                <button type="submit" class="btn btn-success">💾 Zapisz notatkę</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">❌ Anuluj</button>
+            </div>
+        </form>
+    </div>
+</div>

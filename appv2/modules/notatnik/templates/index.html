@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Notatnik Warsztatowy</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/components.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/tables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/modal.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <h1>🚗 Notatnik Warsztatowy</h1>
+            <div>
+                <button class="btn-success" onclick="openModal()">+ Dodaj Notatkę</button>
+                <a href="/" class="btn-secondary">← Dashboard</a>
+            </div>
+        </div>
+
+        <!-- WYSZUKIWANIE -->
+        <div class="search-rej">
+            <input type="text" id="searchRejInput" placeholder="Wyszukaj po numerze rejestracyjnym..." oninput="filterNotatkiByRej()">
+            <button class="btn-secondary" onclick="clearRejSearch()">Wyczyść</button>
+        </div>
+
+        <!-- AKCJE GRUPOWE -->
+        <div class="actions-bar">
+            <button class="btn-warning" onclick="editSelected()">✏️ Edytuj zaznaczone</button>
+            <button class="btn-danger" onclick="deleteSelected()">🗑️ Usuń zaznaczone</button>
+            <span style="margin-left: 15px; color: #6c757d;">Zaznacz notatki checkboxami w tabeli</span>
+        </div>
+
+        <!-- TABELA NOTATEK -->
+        <h3>📝 Wszystkie notatki</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th width="40">
+                        <input type="checkbox" id="selectAll" onchange="toggleAllCheckboxes()">
+                    </th>
+                    <th>Data</th>
+                    <th>Właściciel</th>
+                    <th>Pojazd</th>
+                    <th>Treść</th>
+                    <th>Kosztorys</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for notatka in notatki %}
+                <tr class="notatka-{{ notatka.typ_notatki }}" data-nr-rej="{% if notatka.samochod %}{{ notatka.samochod.nr_rejestracyjny }}{% endif %}">
+                    <td>
+                        <input type="checkbox" class="note-checkbox" value="{{ notatka.id }}">
+                    </td>
+                    <td>{{ notatka.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                    <td>
+                        {% if notatka.samochod and notatka.samochod.klient %}
+                            {{ notatka.samochod.klient.nazwapelna }}
+                        {% else %}
+                            Szybka notatka
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if notatka.samochod %}
+                            {{ notatka.samochod.nr_rejestracyjny }}
+                            <br><small>{{ notatka.samochod.marka }} {{ notatka.samochod.model }}</small>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{{ notatka.tresc }}</td>
+                    <td>
+                        {% if notatka.kosztorysy %}
+                            <a href="/kosztorys/detail/{{ notatka.id }}" class="btn-small">
+                                💰 {{ "%.2f"|format(notatka.kosztorysy[0].kwota_calkowita) }} zł
+                            </a>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- MODALE -->
+        {% include 'modals/add_note_modal.html' %}
+        {% include 'modals/edit_note_modal.html' %}
+    </div>
+
+    <script src="{{ url_for('static', path='/js/notes.js') }}"></script>
+</body>
+</html>

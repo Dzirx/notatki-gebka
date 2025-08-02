@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - System Warsztatowy</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/components.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/dashboard.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <header class="header">
+            <div class="header-content">
+                <h1 class="header-title">🏢 System Warsztatowy</h1>
+                <p class="header-subtitle">Zarządzanie warsztatem samochodowym</p>
+            </div>
+        </header>
+
+        <!-- DASHBOARD GRID -->
+        <main class="dashboard">
+            <div class="dashboard-grid">
+                {% for module in modules %}
+                <a href="{{ module.url }}" class="dashboard-card">
+                    <div class="card-icon">{{ module.icon }}</div>
+                    <h2 class="card-title">{{ module.name }}</h2>
+                    <p class="card-description">{{ module.description }}</p>
+                    <div class="card-arrow"></div>
+                </a>
+                {% endfor %}
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', path='/js/common.js') }}"></script>
+</body>
+</html>

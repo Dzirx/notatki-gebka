@@ -1,0 +1,17 @@
+<!-- MODAL: EDYTUJ NOTATKĘ -->
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeEditModal()">&times;</span>
+        <h3>Edytuj Notatkę</h3>
+        <form id="editForm">
+            <div class="form-group">
+                <label>Treść notatki:</label>
+                <textarea id="edit_tresc" placeholder="Treść notatki..." required></textarea>
+            </div>
+            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 25px;">
+                <button type="submit" class="btn btn-primary">💾 Zapisz zmiany</button>
+                <button type="button" class="btn btn-secondary" onclick="closeEditModal()">❌ Anuluj</button>
+            </div>
+        </form>
+    </div>
+</div>

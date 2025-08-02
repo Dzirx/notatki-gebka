@@ -1,0 +1,95 @@
+/* === MODAL.CSS - STYLE MODALI === */
+
+.modal { 
+    display: none; 
+    position: fixed; 
+    z-index: 1000; 
+    left: 0; 
+    top: 0;
+    width: 100%; 
+    height: 100%; 
+    background: rgba(0,0,0,0.5);
+}
+
+.modal-content { 
+    background: white; 
+    margin: 5% auto; 
+    padding: 30px; 
+    width: 90%; 
+    max-width: 500px; 
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.close { 
+    color: #aaa; 
+    float: right; 
+    font-size: 28px; 
+    font-weight: bold;
+    cursor: pointer; 
+    line-height: 1;
+}
+
+.close:hover { 
+    color: #000; 
+}
+
+/* FORMULARZE W MODALACH */
+.form-group { 
+    margin: 15px 0; 
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.form-group input, 
+.form-group textarea, 
+.form-group select { 
+    width: 100%;
+    padding: 12px; 
+    border: 1px solid #ddd; 
+    border-radius: 6px; 
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.form-group textarea { 
+    height: 120px; 
+    resize: vertical; 
+}
+
+/* PRZYCISKI W MODALACH */
+.btn-success { 
+    background: #28a745; 
+    color: white; 
+}
+
+.btn-success:hover { 
+    background: #218838; 
+}
+
+.btn-warning { 
+    background: #ffc107; 
+    color: #212529; 
+}
+
+.btn-warning:hover { 
+    background: #e0a800; 
+}
+
+.btn-danger { 
+    background: #dc3545; 
+    color: white; 
+}
+
+.btn-danger:hover { 
+    background: #c82333; 
+}
+
+/* HIDDEN HELPER */
+.hidden { 
+    display: none !important; 
+}

@@ -1,5 +1,5 @@
 # === MODULES/NOTATNIK/ROUTES/HTML.PY - ROUTER NOTATNIKA ===
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Request, Depends, HTTPException  # Dodaj HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -45,4 +45,22 @@ async def dodaj_notatke(request: Request):
     """Formularz dodawania notatki"""
     return templates.TemplateResponse("dodaj.html", {
         "request": request
+    })
+
+@router.get("/kosztorys/{notatka_id}", response_class=HTMLResponse)
+async def szczegoly_kosztorysu(notatka_id: int, request: Request, db: Session = Depends(get_db)):
+    """Szczegóły kosztorysów dla notatki"""
+    
+    # Pobierz notatkę
+    notatka = crud.get_notatka_by_id(db, notatka_id)
+    if not notatka:
+        raise HTTPException(status_code=404, detail="Notatka nie znaleziona")
+    
+    # Pobierz kosztorysy z towarami i usługami  
+    kosztorysy = crud.get_kosztorysy_z_towarami_dla_notatki(db, notatka_id)
+    
+    return templates.TemplateResponse("kosztorys_detail.html", {
+        "request": request,
+        "notatka": notatka,
+        "kosztorysy": kosztorysy
     })

@@ -3,10 +3,10 @@
 <head>
     <title>Notatnik Warsztatowy</title>
     <meta charset="utf-8">
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/base.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/components.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/tables.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/modal.css') }}">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/modules/notatnik/static/css/table.css">
+    <link rel="stylesheet" href="/modules/notatnik/static/css/modal.css">
 </head>
 <body>
     <div class="container">
@@ -72,7 +72,7 @@
                     <td>{{ notatka.tresc }}</td>
                     <td>
                         {% if notatka.kosztorysy %}
-                            <a href="/kosztorys/detail/{{ notatka.id }}" class="btn-small">
+                            <a href="/notatnik/kosztorys/{{ notatka.id }}" class="btn-small">
                                 💰 {{ "%.2f"|format(notatka.kosztorysy[0].kwota_calkowita) }} zł
                             </a>
                         {% else %}
@@ -89,6 +89,6 @@
         {% include 'modals/edit_note_modal.html' %}
     </div>
 
-    <script src="{{ url_for('static', path='/js/notes.js') }}"></script>
+    <script src="/modules/notatnik/static/js/note.js"></script>
 </body>
 </html>

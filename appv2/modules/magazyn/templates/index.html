@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>📦 Magazyn - Opony na dzień</title>
-    <link rel="stylesheet" href="/static/css/base.css">
-    <link rel="stylesheet" href="/static/css/components.css">
-    <link rel="stylesheet" href="/static/css/tables.css">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/components.css') }}">
     <link rel="stylesheet" href="/modules/magazyn/static/css/magazyn.css">
 </head>
 <body>
@@ -19,7 +18,30 @@
             </div>
         </div>
 
-        <!-- FORMULARZ WYSZUKIWANIA -->
+        <!-- BŁĘDY -->
+        {% if error_message %}
+        <div class="error-container">
+            <h3>❌ Błąd</h3>
+            <p>{{ error_message }}</p>
+            <details>
+                <summary>Pomoc techniczna</summary>
+                <div class="help-content">
+                    <p><strong>Możliwe przyczyny:</strong></p>
+                    <ul>
+                        <li>Brak połączenia z bazą SQL Server</li>
+                        <li>Nieprawidłowe dane logowania</li>
+                        <li>Brak sterownika ODBC Driver 17</li>
+                    </ul>
+                    <p><strong>Sprawdź:</strong></p>
+                    <ul>
+                        <li>Czy SQL Server działa na localhost</li>
+                        <li>Czy baza 'integra_test' istnieje</li>
+                        <li>Czy user 'readonlygebka' ma dostęp</li>
+                    </ul>
+                </div>
+            </details>
+        </div>
+        {% endif %}
         <div class="search-form-container">
             <h3>🗓️ Wybierz datę</h3>
             <form method="post" class="date-search-form">

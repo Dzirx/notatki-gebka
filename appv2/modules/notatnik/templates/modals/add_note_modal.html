@@ -1,6 +1,6 @@
 <!-- MODAL: DODAJ NOTATKĘ -->
 <div id="noteModal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 900px;">
         <span class="close" onclick="closeModal()">&times;</span>
         <h3>Dodaj Notatkę</h3>
         <form action="/notatnik/add" method="post">
@@ -19,18 +19,24 @@
             
             <div id="nr_rej_group" class="form-group hidden">
                 <label>Numer rejestracyjny pojazdu:</label>
-                <input type="text" id="nr_rejestracyjny" name="nr_rejestracyjny" placeholder="np. WAW12345">
-                <button type="button" class="btn btn-primary" onclick="pobierzInformacje()">📋 Pobierz informacje</button>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text" id="nr_rejestracyjny" name="nr_rejestracyjny" placeholder="np. LLB58411" style="flex: 1;">
+                    <button type="button" class="btn btn-primary" onclick="pobierzInformacje()">📋 Pobierz z integra</button>
+                    <button type="button" onclick="syncTowary()">🔄 Synchronizuj towary</button>
+                </div>
             </div>
             
-            <div id="pojazd_info" class="hidden" style="background: #e7f3ff; padding: 15px; margin: 10px 0; border-radius: 6px;">
-                <!-- Informacje o pojeździe będą tu -->
+            <div id="pojazd_info" class="hidden" style="background: #e7f3ff; padding: 15px; margin: 10px 0; border-radius: 6px; max-height: 500px; overflow-y: auto;">
+                <!-- Informacje o pojeździe i kosztorysy będą tu -->
             </div>
             
             <div class="form-group">
                 <label>Treść notatki:</label>
                 <textarea name="tresc" placeholder="Opisz wykonane prace, ustalone ustalenia lub uwagi..." required></textarea>
             </div>
+            
+            <!-- UKRYTE POLE DLA IMPORTOWANYCH KOSZTORYSÓW -->
+            <input type="hidden" id="importowane_kosztorysy" name="importowane_kosztorysy" value="">
             
             <div style="display: flex; gap: 15px; justify-content: center; margin-top: 25px;">
                 <button type="submit" class="btn btn-success">💾 Zapisz notatkę</button>

@@ -23,9 +23,18 @@ function resetModalForm() {
     document.getElementById('pojazd_info').classList.add('hidden');
     document.querySelector('textarea[name="tresc"]').value = '';
     
+    // Reset ukrytego pola kosztorysów ← DODAJ TO
+    document.getElementById('importowane_kosztorysy').value = '';
+    
+    // Reset zmiennych globalnych ← DODAJ TO  
+    window.dostepneKosztorysy = [];
+    window.wybraneKosztorysy = [];
+    
     // Reset przycisków typu
     document.querySelectorAll('[data-type]').forEach(btn => {
         btn.classList.remove('active');
+        btn.classList.remove('btn-primary');     // ← DODAJ TO
+        btn.classList.add('btn-secondary');      // ← DODAJ TO
     });
 }
 
@@ -53,21 +62,78 @@ function selectNoteType(type) {
     }
 }
 
-function pobierzInformacje() {
+async function pobierzInformacje() {
     const nrRej = document.getElementById('nr_rejestracyjny').value;
     if (!nrRej) {
         alert('Wprowadź numer rejestracyjny');
         return;
     }
     
-    // TODO: Implementacja pobierania danych pojazdu
     const infoDiv = document.getElementById('pojazd_info');
-    infoDiv.innerHTML = `
-        <h4>🚗 Przykładowy pojazd ${nrRej}</h4>
-        <p><strong>Właściciel:</strong> Jan Kowalski</p>
-        <p><em>TODO: Połączenie z bazą danych</em></p>
-    `;
+    infoDiv.innerHTML = '<p>🔄 Pobieranie danych z systemu integra...</p>';
     infoDiv.classList.remove('hidden');
+    
+    try {
+        // Pobierz kosztorysy z SQL Server
+        const response = await fetch(`/api/kosztorysy-zewnetrzne/${nrRej}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.detail || 'Błąd pobierania danych');
+        }
+        
+        if (data.kosztorysy.length === 0) {
+            infoDiv.innerHTML = `
+                <h4>❌ Brak danych dla pojazdu ${nrRej}</h4>
+                <p>Nie znaleziono kosztorysów w systemie integra.</p>
+            `;
+            return;
+        }
+        
+        // Wyświetl informacje o pojeździe i kosztorysy
+        let html = `
+            <h4>🚗 ${data.pojazd_info.marka} ${data.pojazd_info.model} (${data.pojazd_info.rok_produkcji})</h4>
+            <p><strong>Numer rejestracyjny:</strong> ${data.pojazd_info.numer_rejestracyjny}</p>
+            <h5>💰 Dostępne kosztorysy (${data.kosztorysy.length}):</h5>
+            <div style="max-height: 300px; overflow-y: auto;">
+        `;
+        
+        data.kosztorysy.forEach((kosztorys, index) => {
+            html += `
+                <div style="border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 6px; background: #f9f9f9;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="kosztorys_${index}" value="${index}" onchange="toggleKosztorys(${index})">
+                        <label for="kosztorys_${index}" style="cursor: pointer; flex: 1;">
+                            <strong>${kosztorys.numer_kosztorysu}</strong> - ${kosztorys.kwota_kosztorysu.toFixed(2)} zł
+                        </label>
+                    </div>
+                    <p><strong>Klient:</strong> ${kosztorys.nazwa_klienta} (${kosztorys.telefon || 'brak tel.'})</p>
+                    ${kosztorys.towary_szczegoly ? `<p><strong>Towary:</strong> ${kosztorys.towary_szczegoly}</p>` : ''}
+                    ${kosztorys.uslugi_szczegoly ? `<p><strong>Usługi:</strong> ${kosztorys.uslugi_szczegoly}</p>` : ''}
+                </div>
+            `;
+        });
+        
+        html += `
+            </div>
+            <button type="button" class="btn btn-success" onclick="importujWybraneKosztorysy()" style="margin-top: 15px;">
+                📥 Importuj wybrane kosztorysy
+            </button>
+        `;
+        
+        infoDiv.innerHTML = html;
+        
+        // Zapisz dane kosztorysów w zmiennej globalnej
+        window.dostepneKosztorysy = data.kosztorysy;
+        window.wybraneKosztorysy = [];
+        
+    } catch (error) {
+        console.error('Błąd:', error);
+        infoDiv.innerHTML = `
+            <h4>❌ Błąd pobierania danych</h4>
+            <p>${error.message}</p>
+        `;
+    }
 }
 
 // WYSZUKIWANIE
@@ -125,6 +191,101 @@ function deleteSelected() {
     
     if (confirm(`Czy na pewno chcesz usunąć ${selected.length} notatek?`)) {
         alert(`Usuwanie notatek: ${selected.join(', ')} - TODO: implementacja`);
+    }
+}
+
+function toggleKosztorys(index) {
+    const checkbox = document.getElementById(`kosztorys_${index}`);
+    if (checkbox.checked) {
+        if (!window.wybraneKosztorysy.includes(index)) {
+            window.wybraneKosztorysy.push(index);
+        }
+    } else {
+        window.wybraneKosztorysy = window.wybraneKosztorysy.filter(i => i !== index);
+    }
+    console.log('Wybrane kosztorysy:', window.wybraneKosztorysy);
+}
+
+async function importujWybraneKosztorysy() {
+    if (!window.wybraneKosztorysy || window.wybraneKosztorysy.length === 0) {
+        alert('Wybierz przynajmniej jeden kosztorys do importu');
+        return;
+    }
+    
+    // Przygotuj dane kosztorysów do importu
+    const wybraneKosztorysyData = window.wybraneKosztorysy.map(index => window.dostepneKosztorysy[index]);
+    
+    // Zapisz wybrane kosztorysy w ukrytym polu formularza
+    document.getElementById('importowane_kosztorysy').value = JSON.stringify(wybraneKosztorysyData);
+    
+    // Pokaż podsumowanie
+    const podsumowanie = wybraneKosztorysyData.map(k => 
+        `• ${k.numer_kosztorysu} - ${k.kwota_kosztorysu.toFixed(2)} zł`
+    ).join('\n');
+    
+    const potwierdz = confirm(`Zostaną zaimportowane kosztorysy:\n\n${podsumowanie}\n\nKontynuować?`);
+    
+    if (potwierdz) {
+        // Oznacz że kosztorysy są gotowe do importu
+        const infoDiv = document.getElementById('pojazd_info');
+        infoDiv.innerHTML += `
+            <div style="background: #d4edda; border: 1px solid #c3e6cb; padding: 10px; margin-top: 15px; border-radius: 6px;">
+                ✅ <strong>Gotowe do importu:</strong> ${window.wybraneKosztorysy.length} kosztorysów
+                <br><small>Kosztorysy zostaną zaimportowane po zapisaniu notatki.</small>
+            </div>
+        `;
+        
+        alert('Kosztorysy przygotowane do importu!\nTeraz wypełnij treść notatki i kliknij "Zapisz notatkę".');
+    }
+}
+
+async function syncTowary() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    try {
+        // Pokaż spinner
+        button.innerHTML = '⏳ Synchronizuję...';
+        button.disabled = true;
+        
+        console.log('🔄 Rozpoczynam synchronizację towarów i usług...');
+        
+        // Wywołaj API
+        const response = await fetch('/api/sync-towary', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.detail || 'Błąd synchronizacji');
+        }
+        
+        // Pokaż wyniki
+        const stats = data.stats;
+        const message = `✅ Synchronizacja zakończona!\n\n` +
+                       `📦 Towary:\n` +
+                       `  • Dodane: ${stats.towary_dodane}\n` +
+                       `  • Zaktualizowane: ${stats.towary_zaktualizowane}\n\n` +
+                       `🔧 Usługi:\n` +
+                       `  • Dodane: ${stats.uslugi_dodane}\n` +
+                       `  • Zaktualizowane: ${stats.uslugi_zaktualizowane}\n\n` +
+                       `⏱️ Czas: ${data.czas_wykonania}s`;
+        
+        alert(message);
+        console.log('✅ Synchronizacja zakończona:', data);
+        
+    } catch (error) {
+        console.error('❌ Błąd synchronizacji:', error);
+        alert(`❌ Błąd synchronizacji:\n${error.message}`);
+        
+    } finally {
+        // Przywróć przycisk
+        button.innerHTML = originalText;
+        button.disabled = false;
     }
 }
 

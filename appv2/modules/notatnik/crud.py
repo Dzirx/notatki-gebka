@@ -1,7 +1,7 @@
 # === MODULES/NOTATNIK/CRUD.PY - OPERACJE BAZODANOWE ===
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text
-from models import Notatka, Samochod, Kosztorys, KosztorysTowar, KosztorysUsluga, Towar, Usluga
+from models import Notatka, Samochod, Kosztorys, KosztorysTowar, KosztorysUsluga, Towar, Usluga, Klient
 from typing import List, Dict, Any
 
 # === NOTATKI ===
@@ -178,3 +178,196 @@ def add_usluge_do_kosztorysu(db: Session, kosztorys_id: int, usluga_id: int,
     db.commit()
     db.refresh(kosztorys_usluga)
     return kosztorys_usluga
+
+def get_or_create_klient(db: Session, nazwa: str, telefon: str = None, nip: str = None):
+    """Znajdź klienta lub utwórz nowego"""
+    from models import Klient
+    
+    # Spróbuj znaleźć po nazwie lub NIP
+    klient = None
+    if nip:
+        klient = db.query(Klient).filter(Klient.nip == nip).first()
+    
+    if not klient and nazwa:
+        klient = db.query(Klient).filter(Klient.nazwapelna == nazwa).first()
+    
+    # Jeśli nie znalazł, utwórz nowego
+    if not klient:
+        klient = Klient(
+            nazwapelna=nazwa,
+            nr_telefonu=telefon,
+            nip=nip
+        )
+        db.add(klient)
+        db.commit()
+        db.refresh(klient)
+        print(f"✅ Utworzono nowego klienta: {nazwa}")
+    else:
+        print(f"📋 Znaleziono istniejącego klienta: {nazwa}")
+    
+    return klient
+
+def create_samochod(db: Session, klient_id: int, nr_rejestracyjny: str, 
+                   marka: str = None, model: str = None, rok_produkcji: int = None):
+    """Tworzy nowy samochód"""
+    from models import Samochod
+    
+    # Sprawdź czy samochód już istnieje
+    existing = db.query(Samochod).filter(Samochod.nr_rejestracyjny == nr_rejestracyjny).first()
+    if existing:
+        print(f"📋 Znaleziono istniejący samochód: {nr_rejestracyjny}")
+        return existing
+    
+    samochod = Samochod(
+        klient_id=klient_id,
+        nr_rejestracyjny=nr_rejestracyjny,
+        marka=marka,
+        model=model,
+        rok_produkcji=rok_produkcji
+    )
+    db.add(samochod)
+    db.commit()
+    db.refresh(samochod)
+    print(f"✅ Utworzono nowy samochód: {nr_rejestracyjny} - {marka} {model}")
+    return samochod
+
+async def sync_towary_i_uslugi_from_sql(db_pg: Session, db_sql: Session):
+    """Synchronizuje towary i usługi z SQL Server do PostgreSQL (lustrzane odbicie)"""
+    
+    stats = {
+        "towary_dodane": 0,
+        "towary_zaktualizowane": 0,
+        "uslugi_dodane": 0,
+        "uslugi_zaktualizowane": 0
+    }
+    
+    try:
+        # === SYNCHRONIZACJA TOWARÓW ===
+        print("📦 Synchronizuję towary...")
+        
+        # Pobierz wszystkie towary z SQL Server
+        towary_sql_query = text("SELECT id, nazwa, bazowaCenaSprzedazyBrutto FROM Towary ORDER BY id")
+        result = db_sql.execute(towary_sql_query)
+        towary_sql = result.fetchall()
+        
+        print(f"📋 Znaleziono {len(towary_sql)} towarów w SQL Server")
+        
+        for row in towary_sql:
+            # Sprawdź czy towar istnieje w PostgreSQL
+            existing_towar = db_pg.query(Towar).filter(Towar.id == row.id).first()
+            
+            if existing_towar:
+                # Zaktualizuj istniejący towar
+                existing_towar.nazwa = row.nazwa
+                existing_towar.cena = float(row.cena) if row.cena else 0.0
+                existing_towar.updated_at = func.now()
+                stats["towary_zaktualizowane"] += 1
+            else:
+                # Utwórz nowy towar z tym samym ID
+                new_towar = Towar(
+                    id=row.id,
+                    nazwa=row.nazwa,
+                    cena=float(row.cena) if row.cena else 0.0
+                )
+                db_pg.add(new_towar)
+                stats["towary_dodane"] += 1
+        
+        # === SYNCHRONIZACJA USŁUG ===
+        print("🔧 Synchronizuję usługi...")
+        
+        # Pobierz wszystkie usługi z SQL Server
+        uslugi_sql_query = text("SELECT id, nazwa, cena FROM Uslugi ORDER BY id")
+        result = db_sql.execute(uslugi_sql_query)
+        uslugi_sql = result.fetchall()
+        
+        print(f"📋 Znaleziono {len(uslugi_sql)} usług w SQL Server")
+        
+        for row in uslugi_sql:
+            # Sprawdź czy usługa istnieje w PostgreSQL
+            existing_usluga = db_pg.query(Usluga).filter(Usluga.id == row.id).first()
+            
+            if existing_usluga:
+                # Zaktualizuj istniejącą usługę
+                existing_usluga.nazwa = row.nazwa
+                existing_usluga.cena = float(row.cena) if row.cena else 0.0
+                existing_usluga.updated_at = func.now()
+                stats["uslugi_zaktualizowane"] += 1
+            else:
+                # Utwórz nową usługę z tym samym ID
+                new_usluga = Usluga(
+                    id=row.id,
+                    nazwa=row.nazwa,
+                    cena=float(row.cena) if row.cena else 0.0
+                )
+                db_pg.add(new_usluga)
+                stats["uslugi_dodane"] += 1
+        
+        # Zapisz wszystkie zmiany
+        db_pg.commit()
+        
+        print(f"✅ Synchronizacja zakończona:")
+        print(f"   📦 Towary: +{stats['towary_dodane']}, ~{stats['towary_zaktualizowane']}")
+        print(f"   🔧 Usługi: +{stats['uslugi_dodane']}, ~{stats['uslugi_zaktualizowane']}")
+        
+        return stats
+        
+    except Exception as e:
+        db_pg.rollback()
+        print(f"❌ Błąd synchronizacji: {e}")
+        raise e
+    
+def get_or_create_towar_by_id(db: Session, towar_id: int, nazwa: str, cena: float):
+    """Znajdź towar po ID lub utwórz z tym ID (lustrzane odbicie)"""
+    from models import Towar
+    
+    # Sprawdź czy towar istnieje
+    towar = db.query(Towar).filter(Towar.id == towar_id).first()
+    
+    if not towar:
+        # Utwórz nowy towar z zadanym ID
+        towar = Towar(
+            id=towar_id,
+            nazwa=nazwa,
+            cena=cena
+        )
+        db.add(towar)
+        db.commit()
+        db.refresh(towar)
+        print(f"✅ Utworzono towar: {nazwa} (ID: {towar_id})")
+    else:
+        # Zaktualizuj cenę jeśli się różni
+        if float(towar.cena or 0) != cena:
+            towar.cena = cena
+            towar.updated_at = func.now()
+            db.commit()
+            print(f"🔄 Zaktualizowano cenę towaru: {nazwa} (ID: {towar_id})")
+    
+    return towar
+
+def get_or_create_usluga_by_id(db: Session, usluga_id: int, nazwa: str, cena: float):
+    """Znajdź usługę po ID lub utwórz z tym ID (lustrzane odbicie)"""
+    from models import Usluga
+    
+    # Sprawdź czy usługa istnieje
+    usluga = db.query(Usluga).filter(Usluga.id == usluga_id).first()
+    
+    if not usluga:
+        # Utwórz nową usługę z zadanym ID
+        usluga = Usluga(
+            id=usluga_id,
+            nazwa=nazwa,
+            cena=cena
+        )
+        db.add(usluga)
+        db.commit()
+        db.refresh(usluga)
+        print(f"✅ Utworzono usługę: {nazwa} (ID: {usluga_id})")
+    else:
+        # Zaktualizuj cenę jeśli się różni
+        if float(usluga.cena or 0) != cena:
+            usluga.cena = cena
+            usluga.updated_at = func.now()
+            db.commit()
+            print(f"🔄 Zaktualizowano cenę usługi: {nazwa} (ID: {usluga_id})")
+    
+    return usluga

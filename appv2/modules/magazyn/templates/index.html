@@ -42,6 +42,8 @@
             </details>
         </div>
         {% endif %}
+
+        <!-- FORMULARZ WYSZUKIWANIA -->
         <div class="search-form-container">
             <h3>🗓️ Wybierz datę</h3>
             <form method="post" class="date-search-form">
@@ -80,7 +82,7 @@
             </div>
             
             <div class="table-responsive">
-                <table class="opony-table">
+                <table class="opony-table" id="opony-table">
                     <thead>
                         <tr>
                             <th>Nr Rejestracyjny</th>
@@ -90,46 +92,89 @@
                             <th>Bieżnik</th>
                             <th>Lokalizacja</th>
                             <th>Nr Kosztorysu</th>
-                            <th>Towary</th>
-                            <th>Usługi</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for opona in opony_data %}
-                        <tr>
-                            <td><strong>{{ opona.rej }}</strong></td>
-                            <td>{{ opona.name }}</td>
-                            <td>{{ opona.wheels }}</td>
-                            <td>
-                                <span class="opona-type opona-{{ opona.rodzaj_opony }}">
-                                    {{ opona.rodzaj_opony }}
-                                </span>
-                            </td>
-                            <td>{{ opona.bieznik }}</td>
-                            <td><code>{{ opona.lokalizacja }}</code></td>
-                            <td><span class="numer-kosztorysu">{{ opona.numer }}</span></td>
-                            <td class="towary-cell">
-                                {% if opona.towary_szczegoly %}
-                                    <details>
-                                        <summary>Pokaż towary</summary>
-                                        <div class="details-content">{{ opona.towary_szczegoly }}</div>
-                                    </details>
-                                {% else %}
-                                    <em>Brak</em>
+                        {% if opony_data %}
+                            {% set grouped_vehicles = {} %}
+                            {% for opona in opony_data %}
+                                {% if opona.rej not in grouped_vehicles %}
+                                    {% set _ = grouped_vehicles.update({opona.rej: []}) %}
                                 {% endif %}
-                            </td>
-                            <td class="uslugi-cell">
-                                {% if opona.uslugi_szczegoly %}
-                                    <details>
-                                        <summary>Pokaż usługi</summary>
-                                        <div class="details-content">{{ opona.uslugi_szczegoly }}</div>
-                                    </details>
-                                {% else %}
-                                    <em>Brak</em>
+                                {% set _ = grouped_vehicles[opona.rej].append(opona) %}
+                            {% endfor %}
+                            
+                            {% for rej, opony in grouped_vehicles.items() %}
+                                {% if not loop.first %}
+                                <tr class="vehicle-separator">
+                                    <td colspan="7"></td>
+                                </tr>
                                 {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
+                                
+                                <tr class="vehicle-header">
+                                    <td colspan="7">
+                                        <strong>🚗 {{ rej }}</strong>
+                                        <span class="vehicle-stats">({{ opony|length }} opon)</span>
+                                    </td>
+                                </tr>
+                                
+                                {% for opona in opony %}
+                                <tr class="opona-row">
+                                    <td><strong>{% if loop.first %}{{ opona.rej }}{% endif %}</strong></td>
+                                    <td>{{ opona.name }}</td>
+                                    <td>{{ opona.wheels }}</td>
+                                    <td>
+                                        <span class="opona-type opona-{{ opona.rodzaj_opony }}">
+                                            {{ opona.rodzaj_opony }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="bieznik-value {% if opona.bieznik >= 6 %}bieznik-good{% elif opona.bieznik >= 3 %}bieznik-medium{% else %}bieznik-poor{% endif %}">
+                                            {{ opona.bieznik }}mm
+                                        </span>
+                                    </td>
+                                    <td><code>{{ opona.lokalizacja }}</code></td>
+                                    <td><span class="numer-kosztorysu">{{ opona.numer }}</span></td>
+                                </tr>
+                                {% endfor %}
+                                
+                                {% set kosztorysy = {} %}
+                                {% for opona in opony %}
+                                    {% if opona.towary_szczegoly or opona.uslugi_szczegoly %}
+                                        {% set numer = opona.numer or 'Brak numeru' %}
+                                        {% if numer not in kosztorysy %}
+                                            {% set _ = kosztorysy.update({numer: {'numer': numer, 'towary': None, 'uslugi': None}}) %}
+                                        {% endif %}
+                                        {% if opona.towary_szczegoly and not kosztorysy[numer].towary %}
+                                            {% set _ = kosztorysy[numer].update({'towary': opona.towary_szczegoly}) %}
+                                        {% endif %}
+                                        {% if opona.uslugi_szczegoly and not kosztorysy[numer].uslugi %}
+                                            {% set _ = kosztorysy[numer].update({'uslugi': opona.uslugi_szczegoly}) %}
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if kosztorysy %}
+                                <tr class="towary-uslugi-row">
+                                    <td colspan="7">
+                                        <div class="towary-uslugi-container">
+                                            {% for kosztorys in kosztorysy.values() %}
+                                            <div class="kosztorys-details">
+                                                <strong>💰 Kosztorys: {{ kosztorys.numer }}</strong>
+                                                {% if kosztorys.towary %}
+                                                <div class="towary-section">📦 <strong>Towary:</strong> {{ kosztorys.towary }}</div>
+                                                {% endif %}
+                                                {% if kosztorys.uslugi %}
+                                                <div class="uslugi-section">🔧 <strong>Usługi:</strong> {{ kosztorys.uslugi }}</div>
+                                                {% endif %}
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
                     </tbody>
                 </table>
             </div>

@@ -21,7 +21,58 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Auto-submit po zmianie daty
     setupAutoSubmit();
+    
+    // Wypełnij tabelę danymi
+    fillTable();
 });
+
+// Wypełnia tabelę danymi pogrupowanymi według pojazdów
+function fillTable() {
+    const tbody = document.querySelector('#opony-table tbody');
+    if (!tbody) {
+        return;
+    }
+    
+    // Pobierz dane bezpośrednio z Jinja2 template lub zostaw pustą tabelę
+    // Tabela zostanie wypełniona przez template engine po stronie serwera
+    console.log('📊 Tabela będzie wypełniona przez server-side rendering');
+}
+
+// Funkcja do generowania klasy bieżnika
+function getBieznikClass(bieznik) {
+    const val = parseFloat(bieznik);
+    if (val >= 6) return 'bieznik-good';
+    if (val >= 3) return 'bieznik-medium';
+    return 'bieznik-poor';
+}
+
+// Funkcja do zbierania towarów i usług dla pojazdu
+function getTowyaryUslugiForVehicle(opony) {
+    const kosztorysy = {};
+    
+    opony.forEach(opona => {
+        if (opona.towary_szczegoly || opona.uslugi_szczegoly) {
+            const numer = opona.numer || 'Brak numeru';
+            if (!kosztorysy[numer]) {
+                kosztorysy[numer] = {
+                    numer: numer,
+                    towary: null,
+                    uslugi: null
+                };
+            }
+            
+            if (opona.towary_szczegoly && !kosztorysy[numer].towary) {
+                kosztorysy[numer].towary = opona.towary_szczegoly;
+            }
+            
+            if (opona.uslugi_szczegoly && !kosztorysy[numer].uslugi) {
+                kosztorysy[numer].uslugi = opona.uslugi_szczegoly;
+            }
+        }
+    });
+    
+    return Object.values(kosztorysy);
+}
 
 // Obsługa szybkich przycisków dat
 function setupQuickDateButtons() {
@@ -143,5 +194,6 @@ function showNotification(message, type = 'info') {
 window.MagazynUtils = {
     formatPolishDate,
     exportToCSV,
-    showNotification
+    showNotification,
+    fillTable
 };

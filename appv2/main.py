@@ -18,7 +18,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # === STATYCZNE PLIKI MODUŁÓW ===
 app.mount("/modules/notatnik/static", StaticFiles(directory="modules/notatnik/static"), name="notatnik_static")
 app.mount("/modules/magazyn/static", StaticFiles(directory="modules/magazyn/static"), name="magazyn_static")
-app.mount("/modules/excel/static", StaticFiles(directory="modules/excel/static"), name="excel_static")
+#app.mount("/modules/excel/static", StaticFiles(directory="modules/excel/static"), name="excel_static")
 
 # === DASHBOARD - STRONA GŁÓWNA ===
 @app.get("/", response_class=HTMLResponse)

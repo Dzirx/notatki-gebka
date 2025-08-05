@@ -3,6 +3,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Dict, Any
 from datetime import datetime
+from decimal import Decimal
+
+def convert_decimal_to_float(value):
+    """Konwertuje Decimal na float dla JSON serialization"""
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
 
 def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
     """Pobiera informacje o oponach na wybrany dzień z bazy samochody_db"""
@@ -31,13 +38,13 @@ def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
                    FOR XML PATH('')
                ), 1, 2, '') ELSE NULL END AS uslugi_szczegoly
         FROM ZapisyTerminarzy zp
-        JOIN Pojazdy p ON p.id = zp.idPojazdy
-        JOIN KartyPrzechowalniOpon ko ON ko.idPojazdy = p.id
-        JOIN OponyKPO kpo ON kpo.idKartyPrzechowalniOpon = ko.id
-        JOIN Felgi f ON kpo.idFelgi = f.id
+        LEFT JOIN Pojazdy p ON p.id = zp.idPojazdy
+        LEFT JOIN KartyPrzechowalniOpon ko ON ko.idPojazdy = p.id
+        LEFT JOIN OponyKPO kpo ON kpo.idKartyPrzechowalniOpon = ko.id
+        LEFT JOIN Felgi f ON kpo.idFelgi = f.id
         LEFT JOIN StanyOpon so ON kpo.idStanyOpon = so.id
-        JOIN ProducenciOpon po ON kpo.idProducenciOpon = po.id
-        INNER JOIN Kosztorysy k ON k.id = zp.idKosztorysy
+        LEFT JOIN ProducenciOpon po ON kpo.idProducenciOpon = po.id
+        LEFT JOIN Kosztorysy k ON k.id = zp.idKosztorysy
         WHERE (
             (CAST(zp.opis AS VARCHAR(100)) NOT LIKE '% %' AND CAST(zp.opis AS VARCHAR(100)) NOT LIKE '%/%'
              AND CAST(zp.opis AS VARCHAR(100)) = LEFT(ko.numer, CHARINDEX('/', ko.numer + '/') - 1))
@@ -61,7 +68,9 @@ def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
         result = db.execute(query, {"selected_date": selected_date})
         rows = result.fetchall()
         
-        # Konwersja wyników na listę słowników
+        print(f"🔍 Zapytanie zwróciło {len(rows)} rekordów dla daty {selected_date}")
+        
+        # Konwersja wyników na listę słowników z obsługą Decimal
         opony_data = []
         for row in rows:
             opony_data.append({
@@ -69,9 +78,9 @@ def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
                 "name": row.name,
                 "wheels": row.wheels,
                 "rodzaj_opony": row.rodzaj_opony,
-                "bieznik": row.bieznik,
+                "bieznik": convert_decimal_to_float(row.bieznik),  # ← KONWERSJA DECIMAL
                 "lokalizacja": row.lokalizacja,
-                "data": row.data,
+                "data": row.data.isoformat() if row.data else None,  # ← KONWERSJA DATETIME
                 "numer": row.numer,
                 "towary_szczegoly": row.towary_szczegoly,
                 "uslugi_szczegoly": row.uslugi_szczegoly
@@ -80,7 +89,7 @@ def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
         return opony_data
         
     except Exception as e:
-        print(f"Błąd podczas pobierania danych opon: {e}")
+        print(f"❌ Błąd podczas pobierania danych opon: {e}")
         return []
 
 def get_dostepne_daty_opon(db: Session, limit: int = 30) -> List[str]:
@@ -103,4 +112,57 @@ def get_dostepne_daty_opon(db: Session, limit: int = 30) -> List[str]:
         
     except Exception as e:
         print(f"Błąd podczas pobierania dostępnych dat: {e}")
+        return []
+
+# FUNKCJA DEBUGOWA - dodaj ją tymczasowo
+def debug_zapisy_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
+    """Funkcja debugowa - sprawdza podstawowe dane bez skomplikowanych JOIN-ów"""
+    
+    query = text("""
+        SELECT 
+            p.nrRejestracyjny AS rej,
+            zp.opis,
+            zp.data,
+            zp.id as zapisy_id,
+            k.id as kosztorys_id,
+            CASE WHEN k.id IS NOT NULL THEN 'MA_KOSZTORYS' ELSE 'BRAK_KOSZTORYSU' END as status_kosztorysu
+        FROM ZapisyTerminarzy zp
+        INNER JOIN Pojazdy p ON p.id = zp.idPojazdy
+        LEFT JOIN Kosztorysy k ON k.id = zp.idKosztorysy
+        WHERE CAST(zp.data AS DATE) = :selected_date
+        ORDER BY p.nrRejestracyjny
+    """)
+    
+    try:
+        result = db.execute(query, {"selected_date": selected_date})
+        rows = result.fetchall()
+        
+        print(f"🔍 DEBUGOWANIE dla daty {selected_date}:")
+        print(f"📊 Znaleziono {len(rows)} zapisów terminów")
+        
+        z_kosztorysami = sum(1 for row in rows if row.kosztorys_id is not None)
+        bez_kosztorysow = len(rows) - z_kosztorysami
+        
+        print(f"💰 Z kosztorysami: {z_kosztorysami}")
+        print(f"❌ Bez kosztorysów: {bez_kosztorysow}")
+        
+        for row in rows:
+            print(f"  - {row.rej}: {row.opis} ({row.status_kosztorysu})")
+        
+        # Konwersja z obsługą typów danych
+        debug_data = []
+        for row in rows:
+            debug_data.append({
+                "rej": row.rej,
+                "opis": row.opis,
+                "data": row.data.isoformat() if row.data else None,
+                "zapisy_id": row.zapisy_id,
+                "kosztorys_id": row.kosztorys_id,
+                "status_kosztorysu": row.status_kosztorysu
+            })
+        
+        return debug_data
+        
+    except Exception as e:
+        print(f"❌ Błąd debugowania: {e}")
         return []

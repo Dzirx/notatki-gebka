@@ -11,7 +11,7 @@ DATABASE_URL = "postgresql://postgres:password@localhost:5432/notatki_db"
 # Druga baza - samochody (SQL Server) - WYŁĄCZONA LOKALNIE
 try:
     # Spróbuj utworzyć połączenie z SQL Server
-    SAMOCHODY_DB_URL = "mssql+pyodbc://readonlygebka:ZAQ!2wsx@localhost/integra_test?driver=ODBC+Driver+17+for+SQL+Server"
+    SAMOCHODY_DB_URL = "mssql+pyodbc://readonlygebka:ZAQ!2wsx@192.168.1.5/integra_test?driver=ODBC+Driver+17+for+SQL+Server"
     samochody_engine = create_engine(SAMOCHODY_DB_URL)
     print("✅ SQL Server engine utworzony")
 except ImportError as e:

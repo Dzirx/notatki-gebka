@@ -11,8 +11,8 @@
 /* GRID KAFELKÓW */
 .dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 30px;
+    grid-template-columns: 1fr 1fr 1fr;  /* 3 równe kolumny */
+    gap: 20px;  /* Mniejszy gap */
     width: 100%;
     max-width: 1000px;
 }
@@ -21,16 +21,20 @@
 .dashboard-card {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
-    border-radius: 20px;
-    padding: 40px 30px;
+    border-radius: 16px;
+    padding: 25px 20px;  /* Mniejsze padding */
     text-align: center;
     text-decoration: none;
     color: inherit;
     position: relative;
     overflow: hidden;
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
+    min-height: 200px;  /* Jednaakowa wysokość */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .dashboard-card::before {
@@ -57,8 +61,8 @@
 
 /* IKONA MODUŁU */
 .card-icon {
-    font-size: 4rem;
-    margin-bottom: 20px;
+    font-size: 3rem;  /* Większa ikona */
+    margin-bottom: 15px;
     display: block;
     transition: transform 0.3s ease;
 }
@@ -69,10 +73,10 @@
 
 /* TYTUŁ MODUŁU */
 .card-title {
-    font-size: 1.8rem;
+    font-size: 1.3rem;  /* Mniejszy tytuł */
     font-weight: 700;
     color: #2c3e50;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
     transition: color 0.3s ease;
 }
 
@@ -83,9 +87,9 @@
 /* OPIS MODUŁU */
 .card-description {
     color: #6c757d;
-    font-size: 1rem;
-    line-height: 1.5;
-    margin-bottom: 20px;
+    font-size: 0.85rem;  /* Mniejszy opis */
+    line-height: 1.4;
+    margin-bottom: 0;
     transition: color 0.3s ease;
 }
 
@@ -126,28 +130,26 @@
 /* RESPONSIVE DESIGN */
 @media (max-width: 768px) {
     .dashboard-grid {
-        grid-template-columns: 1fr;
-        gap: 20px;
+        grid-template-columns: 1fr;  /* Na mobile jeden pod drugim */
+        gap: 15px;
         padding: 0 10px;
     }
     
     .dashboard-card {
-        padding: 30px 25px;
+        min-height: 150px;
+        padding: 20px 15px;
     }
     
     .card-icon {
-        font-size: 3.5rem;
-        margin-bottom: 15px;
+        font-size: 2.5rem;
     }
     
     .card-title {
-        font-size: 1.6rem;
-        margin-bottom: 12px;
+        font-size: 1.2rem;
     }
     
     .card-description {
-        font-size: 0.95rem;
-        margin-bottom: 15px;
+        font-size: 0.8rem;
     }
 }
 

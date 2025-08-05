@@ -1,5 +1,5 @@
 # === MODULES/NOTATNIK/ROUTES/FORMS.PY - FORMULARZE NOTATNIKA ===
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Request, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from database import get_db
@@ -23,11 +23,13 @@ async def add_notatka(
     nr_rejestracyjny: Optional[str] = Form(None),
     numer_kosztorysu: Optional[str] = Form(None),
     opis_kosztorysu: Optional[str] = Form(None),
+    importowane_kosztorysy: Optional[str] = Form(None),  # ← NOWE POLE
     db: Session = Depends(get_db)
 ):
-    """DODAWANIE NOTATKI - Szybka lub do pojazdu + opcjonalny kosztorys"""
+    """DODAWANIE NOTATKI - Szybka lub do pojazdu + opcjonalny kosztorys + import z integra"""
     
     ma_kosztorys = bool(numer_kosztorysu and numer_kosztorysu.strip())
+    ma_import_kosztorysow = bool(importowane_kosztorysy and importowane_kosztorysy.strip())
     
     form_data = await request.form()
     wybrane_towary = []
@@ -49,11 +51,44 @@ async def add_notatka(
         if samochod:
             notatka = crud.create_notatka_samochod(db, samochod.id, tresc)
         else:
-            notatka = crud.create_notatka_szybka(db, f"Pojazd {nr_rejestracyjny}: {tresc}")
+            # Utwórz samochód jeśli nie istnieje (z danych z integra)
+            if ma_import_kosztorysow:
+                try:
+                    kosztorysy_data = json.loads(importowane_kosztorysy)
+                    if kosztorysy_data:
+                        pierwszy_kosztorys = kosztorysy_data[0]
+                        pojazd_data = pierwszy_kosztorys.get('pojazd', {})
+                        
+                        # Utwórz klienta jeśli potrzeba
+                        klient = crud.get_or_create_klient(
+                            db, 
+                            nazwa=pierwszy_kosztorys.get('nazwa_klienta'),
+                            telefon=pierwszy_kosztorys.get('telefon'),
+                            nip=pierwszy_kosztorys.get('nip')
+                        )
+                        
+                        # Utwórz samochód
+                        samochod = crud.create_samochod(
+                            db,
+                            klient_id=klient.id,
+                            nr_rejestracyjny=pojazd_data.get('numer_rejestracyjny'),
+                            marka=pojazd_data.get('marka'),
+                            model=pojazd_data.get('model'),
+                            rok_produkcji=pojazd_data.get('rok_produkcji')
+                        )
+                        
+                        notatka = crud.create_notatka_samochod(db, samochod.id, tresc)
+                    else:
+                        notatka = crud.create_notatka_szybka(db, f"Pojazd {nr_rejestracyjny}: {tresc}")
+                except Exception as e:
+                    print(f"Błąd tworzenia samochodu z danych integra: {e}")
+                    notatka = crud.create_notatka_szybka(db, f"Pojazd {nr_rejestracyjny}: {tresc}")
+            else:
+                notatka = crud.create_notatka_szybka(db, f"Pojazd {nr_rejestracyjny}: {tresc}")
     else:
         notatka = crud.create_notatka_szybka(db, tresc)
     
-    # TWORZENIE KOSZTORYSU
+    # TWORZENIE ZWYKŁEGO KOSZTORYSU (stara funkcjonalność)
     if ma_kosztorys and notatka:
         kwota_calkowita = 0.0
         for towar in wybrane_towary:
@@ -86,5 +121,64 @@ async def add_notatka(
                 ilosc=float(usluga['ilosc']),
                 cena=float(usluga['cena'])
             )
+    
+    # IMPORT KOSZTORYSÓW Z INTEGRA (nowa funkcjonalność)
+    if ma_import_kosztorysow and notatka:
+        try:
+            kosztorysy_data = json.loads(importowane_kosztorysy)
+            for kosztorys_data in kosztorysy_data:
+                # Utwórz kosztorys w PostgreSQL
+                kosztorys = crud.create_kosztorys(
+                    db=db,
+                    notatka_id=notatka.id,
+                    kwota=float(kosztorys_data.get('kwota_kosztorysu', 0)),
+                    opis=f"Importowano z integra - {kosztorys_data.get('numer_kosztorysu')}",
+                    numer_kosztorysu=f"IMP-{kosztorys_data.get('numer_kosztorysu')}"
+                )
+                
+                # DODAJ TOWARY (strukturalnie z ID)
+                towary = kosztorys_data.get('towary', [])
+                for towar_data in towary:
+                    # Zapewnij że towar istnieje w PostgreSQL (upsert)
+                    towar = crud.get_or_create_towar_by_id(
+                        db, 
+                        towar_data['id'], 
+                        towar_data['nazwa'], 
+                        towar_data['cena']
+                    )
+                    
+                    # Dodaj do kosztorysu
+                    crud.add_towar_do_kosztorysu(
+                        db=db,
+                        kosztorys_id=kosztorys.id,
+                        towar_id=towar.id,
+                        ilosc=towar_data['ilosc'],
+                        cena=towar_data['cena']
+                    )
+                
+                # DODAJ USŁUGI (strukturalnie z ID)
+                uslugi = kosztorys_data.get('uslugi', [])
+                for usluga_data in uslugi:
+                    # Zapewnij że usługa istnieje w PostgreSQL (upsert)
+                    usluga = crud.get_or_create_usluga_by_id(
+                        db,
+                        usluga_data['id'],
+                        usluga_data['nazwa'], 
+                        usluga_data['cena']
+                    )
+                    
+                    # Dodaj do kosztorysu
+                    crud.add_usluge_do_kosztorysu(
+                        db=db,
+                        kosztorys_id=kosztorys.id,
+                        usluga_id=usluga.id,
+                        ilosc=usluga_data['ilosc'],
+                        cena=usluga_data['cena']
+                    )
+                
+                print(f"✅ Zaimportowano kosztorys: {kosztorys_data.get('numer_kosztorysu')} z {len(towary)} towarami i {len(uslugi)} usługami")
+        
+        except Exception as e:
+            print(f"❌ Błąd importu kosztorysów: {e}")
     
     return RedirectResponse(url="/notatnik", status_code=303)

@@ -1,7 +1,9 @@
 # === MODULES/NOTATNIK/ROUTES/API.PY - API NOTATNIKA ===
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, Request, HTTPException, BackgroundTasks
+import time
 from sqlalchemy.orm import Session
-from database import get_db
+from database import get_db, get_samochody_db
+from sqlalchemy import text
 import sys
 import os
 
@@ -86,3 +88,204 @@ def get_uslugi_api(db: Session = Depends(get_db)):
         }
         for u in uslugi
     ]
+
+@router.get("/kosztorysy-zewnetrzne/{nr_rejestracyjny}")
+def get_kosztorysy_zewnetrzne(nr_rejestracyjny: str, db_sql: Session = Depends(get_samochody_db)):
+    """Pobiera kosztorysy z Microsoft SQL Server (baza integra)"""
+    
+    if db_sql is None:
+        raise HTTPException(status_code=503, detail="Brak połączenia z bazą danych integra")
+    
+    try:
+        # Query SQL Server - dokładnie Twoje zapytanie
+        sql_query = """
+        SELECT 
+            ko.nazwaPelna as nazwa_klienta, 
+            ko.telefon1 as telefon, 
+            ko.nip as nip, 
+            k.numer as numer_kosztorysu, 
+            mp.nazwa as model, 
+            mk.nazwa as marka, 
+            p.rokProdukcji as rok_produkcji, 
+            p.nrRejestracyjny as numer_rejestracyjny, 
+            k.wartoscBrutto as kwota_kosztorysu,
+            
+            -- TOWARY Z ID (zamiast stringów)
+            (SELECT 
+                STRING_AGG(
+                    CAST(t2.id as varchar) + '|' + t2.nazwa + '|' + CAST(tk2.ilosc as varchar) + '|' + CAST(tk2.cena as varchar), 
+                    ';'
+                )
+            FROM TowaryKosztorysow tk2 
+            INNER JOIN Towary t2 ON tk2.idTowary = t2.id 
+            WHERE tk2.idKosztorysy = k.id
+            ) as towary_data,
+            
+            -- USŁUGI Z ID (zamiast stringów)  
+            (SELECT 
+                STRING_AGG(
+                    CAST(u2.id as varchar) + '|' + u2.nazwa + '|' + CAST(uk2.iloscRoboczogodzin as varchar) + '|' + CAST(uk2.cena as varchar), 
+                    ';'
+                )
+            FROM UslugiKosztorysow uk2 
+            INNER JOIN Uslugi u2 ON uk2.idUslugi = u2.id 
+            WHERE uk2.idKosztorysy = k.id
+            ) as uslugi_data
+            
+        FROM Kosztorysy k
+        INNER JOIN Kontrahenci ko ON ko.id = k.idKontrahenci
+        INNER JOIN Pojazdy p ON p.id = k.idPojazdy  
+        INNER JOIN WersjePojazdow wp ON wp.id = p.idWersjePojazdow
+        INNER JOIN ModelePojazdow mp ON mp.id = wp.idModelePojazdow
+        INNER JOIN MarkiPojazdow mk ON mk.id = mp.idMarkiPojazdow
+        WHERE p.nrRejestracyjny = :nr_rejestracyjny
+        ORDER BY k.numer DESC
+        """
+        
+        result = db_sql.execute(text(sql_query), {"nr_rejestracyjny": nr_rejestracyjny})
+        kosztorysy = result.fetchall()
+        
+        if not kosztorysy:
+            return {"kosztorysy": [], "message": f"Brak kosztorysów dla pojazdu {nr_rejestracyjny}"}
+        
+        def parse_towary_data(towary_str):
+            """Parse: '123|FILTR OLEJU|1.0|45.0;124|OLEJ|5.5|56.0' → lista obiektów"""
+            if not towary_str:
+                return []
+            
+            towary = []
+            items = towary_str.split(';')
+            for item in items:
+                if '|' in item:
+                    parts = item.split('|')
+                    if len(parts) == 4:
+                        towary.append({
+                            'id': int(parts[0]),
+                            'nazwa': parts[1],
+                            'ilosc': float(parts[2]),
+                            'cena': float(parts[3])
+                        })
+            return towary
+
+        def parse_uslugi_data(uslugi_str):
+            """Parse: '456|Wymiana oleju|1.0|250.0;...' → lista obiektów"""
+            if not uslugi_str:
+                return []
+            
+            uslugi = []
+            items = uslugi_str.split(';')
+            for item in items:
+                if '|' in item:
+                    parts = item.split('|')
+                    if len(parts) == 4:
+                        uslugi.append({
+                            'id': int(parts[0]),
+                            'nazwa': parts[1],
+                            'ilosc': float(parts[2]),
+                            'cena': float(parts[3])
+                        })
+            return uslugi
+        
+        # Formatuj wyniki
+        kosztorysy_lista = []
+        for row in kosztorysy:
+            # Parse towary i usługi do struktur
+            towary_parsed = parse_towary_data(row.towary_data)
+            uslugi_parsed = parse_uslugi_data(row.uslugi_data)
+            
+            kosztorysy_lista.append({
+                "numer_kosztorysu": row.numer_kosztorysu,
+                "nazwa_klienta": row.nazwa_klienta,
+                "telefon": row.telefon,
+                "nip": row.nip,
+                "pojazd": {
+                    "marka": row.marka,
+                    "model": row.model, 
+                    "rok_produkcji": row.rok_produkcji,
+                    "numer_rejestracyjny": row.numer_rejestracyjny
+                },
+                "kwota_kosztorysu": float(row.kwota_kosztorysu) if row.kwota_kosztorysu else 0.0,
+                "towary": towary_parsed,  # ← STRUKTURALNE DANE
+                "uslugi": uslugi_parsed   # ← STRUKTURALNE DANE
+            })
+        
+        return {
+            "kosztorysy": kosztorysy_lista,
+            "pojazd_info": {
+                "numer_rejestracyjny": kosztorysy[0].numer_rejestracyjny,
+                "marka": kosztorysy[0].marka,
+                "model": kosztorysy[0].model,
+                "rok_produkcji": kosztorysy[0].rok_produkcji
+            } if kosztorysy else None
+        }
+        
+    except Exception as e:
+        print(f"Błąd pobierania kosztorysów z SQL Server: {e}")
+        raise HTTPException(status_code=500, detail=f"Błąd pobierania danych: {str(e)}")
+
+@router.post("/importuj-kosztorys")
+async def importuj_kosztorys_z_externa(request: Request, db: Session = Depends(get_db)):
+    """Importuje wybrany kosztorys z SQL Server do PostgreSQL"""
+    
+    data = await request.json()
+    notatka_id = data.get("notatka_id")
+    kosztorys_externa = data.get("kosztorys_data")
+    
+    if not notatka_id or not kosztorys_externa:
+        raise HTTPException(status_code=400, detail="Brak wymaganych danych")
+    
+    try:
+        # Utwórz kosztorys w PostgreSQL na podstawie danych z SQL Server
+        kosztorys = crud.create_kosztorys(
+            db=db,
+            notatka_id=notatka_id,
+            kwota=float(kosztorys_externa.get("kwota_kosztorysu", 0)),
+            opis=f"Importowano z systemu integra - {kosztorys_externa.get('numer_kosztorysu')}",
+            numer_kosztorysu=f"IMP-{kosztorys_externa.get('numer_kosztorysu')}"
+        )
+        
+        return {
+            "success": True, 
+            "kosztorys_id": kosztorys.id,
+            "message": f"Zaimportowano kosztorys {kosztorys_externa.get('numer_kosztorysu')}"
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Błąd importu: {str(e)}")
+    
+@router.post("/sync-towary")
+async def sync_towary_z_integra(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db), 
+    db_sql: Session = Depends(get_samochody_db)
+):
+    """Synchronizuje towary i usługi z bazy integra (SQL Server) do PostgreSQL"""
+    
+    if db_sql is None:
+        raise HTTPException(status_code=503, detail="Brak połączenia z bazą danych integra")
+    
+    start_time = time.time()
+    
+    try:
+        print("🔄 Rozpoczynam synchronizację towarów i usług z SQL Server...")
+        
+        # Synchronizuj towary i usługi
+        stats = await crud.sync_towary_i_uslugi_from_sql(db, db_sql)
+        
+        end_time = time.time()
+        execution_time = round(end_time - start_time, 2)
+        
+        print(f"✅ Synchronizacja zakończona w {execution_time}s")
+        print(f"📊 Statystyki: {stats}")
+        
+        return {
+            "success": True,
+            "message": "Synchronizacja zakończona pomyślnie",
+            "stats": stats,
+            "czas_wykonania": execution_time
+        }
+        
+    except Exception as e:
+        print(f"❌ Błąd synchronizacji: {e}")
+        raise HTTPException(status_code=500, detail=f"Błąd synchronizacji: {str(e)}")

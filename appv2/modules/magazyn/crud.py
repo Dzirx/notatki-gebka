@@ -22,16 +22,18 @@ def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
                kpo.glebokoscBieznika AS bieznik,
                ko.lokalizacjeOpon AS lokalizacja,
                zp.data AS data,
-               ko.numer AS numer,
+               kpo.wymianaOpis as opona_uwagi,
+               ko.uwagi as karta_przechowywalni_uwagi,
+               ko.numer AS numer_depozytu,
                CASE WHEN ROW_NUMBER() OVER (PARTITION BY zp.id ORDER BY kpo.id) = 1 THEN STUFF((
-                   SELECT DISTINCT ', ' + t2.nazwa + ' (' + CAST(tk2.ilosc AS VARCHAR) + ' szt. x ' + CAST(tk2.cena AS VARCHAR) + ' zl)'
+                   SELECT DISTINCT ', ' + t2.nazwa
                    FROM TowaryKosztorysow tk2
                    INNER JOIN Towary t2 ON tk2.idTowary = t2.id
                    WHERE tk2.idKosztorysy = k.id
                    FOR XML PATH('')
                ), 1, 2, '') ELSE NULL END AS towary_szczegoly,
                CASE WHEN ROW_NUMBER() OVER (PARTITION BY zp.id ORDER BY kpo.id) = 1 THEN STUFF((
-                   SELECT DISTINCT ', ' + u2.nazwa + ' (' + CAST(uk2.iloscRoboczogodzin AS VARCHAR) + ' x ' + CAST(uk2.cena AS VARCHAR) + ' zl)'
+                   SELECT DISTINCT ', ' + u2.nazwa
                    FROM UslugiKosztorysow uk2
                    INNER JOIN Uslugi u2 ON uk2.idUslugi = u2.id
                    WHERE uk2.idKosztorysy = k.id
@@ -78,10 +80,12 @@ def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
                 "name": row.name,
                 "wheels": row.wheels,
                 "rodzaj_opony": row.rodzaj_opony,
-                "bieznik": convert_decimal_to_float(row.bieznik),  # ← KONWERSJA DECIMAL
+                "bieznik": convert_decimal_to_float(row.bieznik),
                 "lokalizacja": row.lokalizacja,
-                "data": row.data.isoformat() if row.data else None,  # ← KONWERSJA DATETIME
-                "numer": row.numer,
+                "data": row.data.isoformat() if row.data else None,
+                "opona_uwagi": row.opona_uwagi,                    # ← NOWE
+                "karta_przechowywalni_uwagi": row.karta_przechowywalni_uwagi,  # ← NOWE
+                "numer_depozytu": row.numer_depozytu,              # ← NOWE (wcześniej 'numer')
                 "towary_szczegoly": row.towary_szczegoly,
                 "uslugi_szczegoly": row.uslugi_szczegoly
             })
@@ -114,7 +118,7 @@ def get_dostepne_daty_opon(db: Session, limit: int = 30) -> List[str]:
         print(f"Błąd podczas pobierania dostępnych dat: {e}")
         return []
 
-# FUNKCJA DEBUGOWA - dodaj ją tymczasowo
+# FUNKCJA DEBUGOWA - zachowana
 def debug_zapisy_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
     """Funkcja debugowa - sprawdza podstawowe dane bez skomplikowanych JOIN-ów"""
     

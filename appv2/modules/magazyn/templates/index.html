@@ -55,7 +55,7 @@
             </div>
 
             <!-- ZAKŁADKA: ZLECENIA -->
-            <div id="zlecenia" class="tab-content {% if active_tab == 'zlecenia' %}active{% endif %}"
+            <div id="zlecenia" class="tab-content {% if active_tab == 'zlecenia' %}active{% endif %}">
                 <h3>📋 Zarządzanie Zleceniami</h3>
                 <div style="padding: 40px; text-align: center; background: #f8f9fa; border-radius: 8px; border: 2px dashed #dee2e6;">
                     <h4>🚧 W budowie</h4>
@@ -65,16 +65,16 @@
             </div>
 
             <!-- ZAKŁADKA: TERMINARZ (nowy widok pogrupowany) -->
-            <div id="terminarz" class="tab-content">
+            <div id="terminarz" class="tab-content {% if active_tab == 'terminarz' %}active{% endif %}">
                 <h3>🗓️ Terminarz - Harmonogram</h3>
-                
+
                 <!-- FORMULARZ WYSZUKIWANIA -->
                 <div class="search-form-container" style="background: none; box-shadow: none; margin-bottom: 20px;">
                     <form method="post" class="date-search-form">
                         <input type="hidden" name="tab" value="terminarz">
                         <div class="form-group">
                             <label for="selected_date">Data:</label>
-                            <input type="date" id="selected_date" name="selected_date" 
+                            <input type="date" id="selected_date" name="selected_date"
                                    value="{{ selected_date or dzisiejsza_data }}" required>
                         </div>
                         <button type="submit" class="btn-primary">🔍 Pokaż harmonogram</button>
@@ -85,12 +85,7 @@
                 {% if selected_date %}
                 <div class="results-container" style="box-shadow: none; background: none; padding: 0;">
                     <h4>🗓️ Harmonogram na: {{ selected_date }}</h4>
-                    
-                    {% if pojazdy_grouped %}
-                    <div class="stats-info">
-                        <p><strong>Pojazdy:</strong> {{ pojazdy_grouped|length }} | <strong>Łączne opony:</strong> {{ pojazdy_grouped|sum(attribute='total_opony') }}</p>
-                    </div>
-                    
+
                     <div class="table-responsive">
                         <table class="opony-table">
                             <thead>
@@ -99,7 +94,6 @@
                                     <th>Felgi/Opony</th>
                                     <th>Lokalizacja</th>
                                     <th>Notatka do depozytu</th>
-                                    <th>Info</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -109,13 +103,8 @@
                                     <td>{{ pojazd.wheels_summary }}</td>
                                     <td>{{ pojazd.lokalizacje_summary }}</td>
                                     <td>{{ pojazd.uwagi_summary }}</td>
-                                    <td>
-                                        <span class="stat-badge">{{ pojazd.depozyty_count }} dep.</span>
-                                        <span class="stat-badge">{{ pojazd.total_opony }} opon</span>
-                                        <span class="expand-icon">▼</span>
-                                    </td>
                                 </tr>
-                                
+
                                 <tr class="pojazd-details" data-rej="{{ pojazd.rej }}" style="display: none;">
                                     <td colspan="5">
                                         <div class="pojazd-content">
@@ -133,7 +122,7 @@
                                                     <p><strong>🔧 Usługi:</strong> {{ depozyt.uslugi_szczegoly }}</p>
                                                     {% endif %}
                                                 </div>
-                                                
+
                                                 <div class="opony-grid">
                                                     {% for opona in depozyt.opony %}
                                                     <div class="opona-card opona-{{ opona.rodzaj_opony }}">
@@ -168,13 +157,10 @@
                             </tbody>
                         </table>
                     </div>
-                    
-                    {% else %}
-                    <div class="no-results">
-                        <p>❌ Brak pojazdów na: <strong>{{ selected_date }}</strong></p>
-                        <p>Spróbuj wybrać inną datę z listy powyżej.</p>
-                    </div>
-                    {% endif %}
+                {% else %}
+                <div class="no-results">
+                    <p>❌ Brak pojazdów na: <strong>{{ selected_date }}</strong></p>
+                    <p>Spróbuj wybrać inną datę z listy powyżej.</p>
                 </div>
                 {% endif %}
             </div>
@@ -185,19 +171,19 @@
     <script src="/modules/magazyn/static/js/magazyn.js"></script>
     <script>
         function switchTab(tabName) {
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelectorAll('.tab-button').forEach(btn => {
-                btn.classList.remove('active');
-            });
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
             document.getElementById(tabName).classList.add('active');
             event.target.classList.add('active');
         }
         
         function togglePojazd(rej) {
-            const group = document.querySelector(`[data-rej="${rej}"]`);
-            group.classList.toggle('expanded');
+            const detailsRow = document.querySelector(`.pojazd-details[data-rej="${rej}"]`);
+            if (detailsRow.style.display === 'none' || !detailsRow.style.display) {
+                detailsRow.style.display = 'table-row';
+            } else {
+                detailsRow.style.display = 'none';
+            }
         }
     </script>
 </body>

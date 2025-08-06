@@ -46,16 +46,16 @@
         <!-- ZAKŁADKI -->
         <div class="tabs-container">
             <div class="tabs-nav">
-                <button class="tab-button active" onclick="switchTab('zlecenia')">
+                <button class="tab-button {% if active_tab == 'zlecenia' %}active{% endif %}" onclick="switchTab('zlecenia')">
                     📋 Zlecenia
                 </button>
-                <button class="tab-button" onclick="switchTab('terminarz')">
+                <button class="tab-button {% if active_tab == 'terminarz' %}active{% endif %}" onclick="switchTab('terminarz')">
                     🗓️ Terminarz
                 </button>
             </div>
 
             <!-- ZAKŁADKA: ZLECENIA -->
-            <div id="zlecenia" class="tab-content active">
+            <div id="zlecenia" class="tab-content {% if active_tab == 'zlecenia' %}active{% endif %}"
                 <h3>📋 Zarządzanie Zleceniami</h3>
                 <div style="padding: 40px; text-align: center; background: #f8f9fa; border-radius: 8px; border: 2px dashed #dee2e6;">
                     <h4>🚧 W budowie</h4>
@@ -64,148 +64,115 @@
                 </div>
             </div>
 
-            <!-- ZAKŁADKA: TERMINARZ (obecna funkcjonalność) -->
+            <!-- ZAKŁADKA: TERMINARZ (nowy widok pogrupowany) -->
             <div id="terminarz" class="tab-content">
-                <h3>🗓️ Terminarz - Opony na dzień</h3>
+                <h3>🗓️ Terminarz - Harmonogram</h3>
                 
                 <!-- FORMULARZ WYSZUKIWANIA -->
                 <div class="search-form-container" style="background: none; box-shadow: none; margin-bottom: 20px;">
                     <form method="post" class="date-search-form">
+                        <input type="hidden" name="tab" value="terminarz">
                         <div class="form-group">
                             <label for="selected_date">Data:</label>
                             <input type="date" id="selected_date" name="selected_date" 
                                    value="{{ selected_date or dzisiejsza_data }}" required>
                         </div>
-                        <button type="submit" class="btn-primary">🔍 Pokaż opony</button>
+                        <button type="submit" class="btn-primary">🔍 Pokaż harmonogram</button>
                     </form>
-                    
-                    <!-- SZYBKIE DATY -->
-                    {% if dostepne_daty %}
-                    <div class="quick-dates">
-                        <h4>Ostatnie dostępne daty:</h4>
-                        <div class="date-buttons">
-                            {% for data in dostepne_daty[:7] %}
-                            <form method="post" style="display: inline;">
-                                <input type="hidden" name="selected_date" value="{{ data }}">
-                                <button type="submit" class="btn-small date-btn">{{ data }}</button>
-                            </form>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
                 </div>
 
                 <!-- WYNIKI TERMINARZ -->
                 {% if selected_date %}
                 <div class="results-container" style="box-shadow: none; background: none; padding: 0;">
-                    <h4>🚗 Opony na dzień: {{ selected_date }}</h4>
+                    <h4>🗓️ Harmonogram na: {{ selected_date }}</h4>
                     
-                    {% if opony_data %}
+                    {% if pojazdy_grouped %}
                     <div class="stats-info">
-                        <p><strong>Znaleziono:</strong> {{ opony_data|length }} rekordów</p>
+                        <p><strong>Pojazdy:</strong> {{ pojazdy_grouped|length }} | <strong>Łączne opony:</strong> {{ pojazdy_grouped|sum(attribute='total_opony') }}</p>
                     </div>
                     
                     <div class="table-responsive">
-                        <table class="opony-table" id="opony-table">
+                        <table class="opony-table">
                             <thead>
                                 <tr>
                                     <th>Nr Rejestracyjny</th>
                                     <th>Felgi/Opony</th>
                                     <th>Lokalizacja</th>
-                                    <th>Nr Depozytu</th>
+                                    <th>Notatka do depozytu</th>
+                                    <th>Info</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% if opony_data %}
-                                    {% set grouped_vehicles = {} %}
-                                    {% for opona in opony_data %}
-                                        {% if opona.rej not in grouped_vehicles %}
-                                            {% set _ = grouped_vehicles.update({opona.rej: []}) %}
-                                        {% endif %}
-                                        {% set _ = grouped_vehicles[opona.rej].append(opona) %}
-                                    {% endfor %}
-                                    
-                                    {% for rej, opony in grouped_vehicles.items() %}
-                                        {% if not loop.first %}
-                                        <tr class="vehicle-separator">
-                                            <td colspan="4"></td>
-                                        </tr>
-                                        {% endif %}
-                                        
-                                        <tr class="vehicle-header">
-                                            <td colspan="4">
-                                                <strong>🚗 {{ rej }}</strong>
-                                                <span class="vehicle-stats">({{ opony|length }} opon)</span>
+                                {% for pojazd in pojazdy_grouped %}
+                                <tr class="vehicle-header" onclick="togglePojazd('{{ pojazd.rej }}')" style="cursor: pointer;">
+                                    <td><strong>{{ pojazd.rej }}</strong></td>
+                                    <td>{{ pojazd.wheels_summary }}</td>
+                                    <td>{{ pojazd.lokalizacje_summary }}</td>
+                                    <td>{{ pojazd.uwagi_summary }}</td>
+                                    <td>
+                                        <span class="stat-badge">{{ pojazd.depozyty_count }} dep.</span>
+                                        <span class="stat-badge">{{ pojazd.total_opony }} opon</span>
+                                        <span class="expand-icon">▼</span>
+                                    </td>
+                                </tr>
+                                
+                                <tr class="pojazd-details" data-rej="{{ pojazd.rej }}" style="display: none;">
+                                    <td colspan="5">
+                                        <div class="pojazd-content">
+                                            {% for depozyt in pojazd.depozyty %}
+                                            <div class="depozyt-section">
+                                                <h5>📦 Depozyt: {{ depozyt.numer_depozytu }}</h5>
+                                                <div class="depozyt-info">
+                                                    <p><strong>Uwagi depozytu:</strong> {{ depozyt.karta_uwagi or "Brak uwag" }}</p>
+                                                    <p><strong>Lokalizacja:</strong> {{ depozyt.lokalizacja }}</p>
+                                                    <p><strong>Felgi/Opony:</strong> {{ depozyt.wheels }}</p>
+                                                    {% if depozyt.towary_szczegoly %}
+                                                    <p><strong>📦 Towary:</strong> {{ depozyt.towary_szczegoly }}</p>
+                                                    {% endif %}
+                                                    {% if depozyt.uslugi_szczegoly %}
+                                                    <p><strong>🔧 Usługi:</strong> {{ depozyt.uslugi_szczegoly }}</p>
+                                                    {% endif %}
+                                                </div>
                                                 
-                                                {% if opony[0].karta_przechowywalni_uwagi %}
-                                                <div style="margin-top: 10px; padding: 8px; background: #fff3cd; border-left: 3px solid #ffc107; font-size: 0.9em;">
-                                                    <strong>📝 Uwagi do depozytu:</strong> {{ opony[0].karta_przechowywalni_uwagi }}
-                                                </div>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                        
-                                        {% for opona in opony %}
-                                        <tr class="opona-row">
-                                            <td><strong>{% if loop.first %}{{ opona.rej }}{% endif %}</strong></td>
-                                            <td>
-                                                {{ opona.wheels }}
-                                                {% if opona.opona_uwagi %}
-                                                <div style="font-size: 0.8em; color: #6c757d; margin-top: 4px;">
-                                                    💬 {{ opona.opona_uwagi }}
-                                                </div>
-                                                {% endif %}
-                                            </td>
-                                            <td><code>{{ opona.lokalizacja }}</code></td>
-                                            <td><span class="numer-kosztorysu">{{ opona.numer_depozytu }}</span></td>
-                                        </tr>
-                                        {% endfor %}
-                                        
-                                        {% set kosztorysy = {} %}
-                                        {% for opona in opony %}
-                                            {% if opona.towary_szczegoly or opona.uslugi_szczegoly %}
-                                                {% set numer = opona.numer or 'Brak numeru' %}
-                                                {% if numer not in kosztorysy %}
-                                                    {% set _ = kosztorysy.update({numer: {'numer': numer, 'towary': None, 'uslugi': None}}) %}
-                                                {% endif %}
-                                                {% if opona.towary_szczegoly and not kosztorysy[numer].towary %}
-                                                    {% set _ = kosztorysy[numer].update({'towary': opona.towary_szczegoly}) %}
-                                                {% endif %}
-                                                {% if opona.uslugi_szczegoly and not kosztorysy[numer].uslugi %}
-                                                    {% set _ = kosztorysy[numer].update({'uslugi': opona.uslugi_szczegoly}) %}
-                                                {% endif %}
-                                            {% endif %}
-                                        {% endfor %}
-                                        
-                                        {% if kosztorysy %}
-                                        <tr class="towary-uslugi-row">
-                                            <td colspan="4">
-                                                <div class="towary-uslugi-container">
-                                                    {% for kosztorys in kosztorysy.values() %}
-                                                    <div class="kosztorys-details">
-                                                        <strong>💰 Kosztorys: {{ kosztorys.numer }}</strong>
-                                                        {% if kosztorys.towary %}
-                                                        <div class="towary-section">📦 <strong>Towary:</strong> {{ kosztorys.towary }}</div>
-                                                        {% endif %}
-                                                        {% if kosztorys.uslugi %}
-                                                        <div class="uslugi-section">🔧 <strong>Usługi:</strong> {{ kosztorys.uslugi }}</div>
-                                                        {% endif %}
+                                                <div class="opony-grid">
+                                                    {% for opona in depozyt.opony %}
+                                                    <div class="opona-card opona-{{ opona.rodzaj_opony }}">
+                                                        <div class="opona-title">{{ opona.name }}</div>
+                                                        <div class="opona-details">
+                                                            <div class="detail-item">
+                                                                <span class="detail-label">Bieżnik:</span>
+                                                                <span class="bieznik-value {% if opona.bieznik >= 6 %}bieznik-good{% elif opona.bieznik >= 3 %}bieznik-medium{% else %}bieznik-poor{% endif %}">
+                                                                    {{ opona.bieznik }}mm
+                                                                </span>
+                                                            </div>
+                                                            <div class="detail-item">
+                                                                <span class="detail-label">Typ:</span>
+                                                                <span class="detail-value">{{ opona.rodzaj_opony }}</span>
+                                                            </div>
+                                                            {% if opona.opona_uwagi %}
+                                                            <div class="detail-item" style="grid-column: 1/-1;">
+                                                                <span class="detail-label">Uwagi opony:</span>
+                                                                <span class="detail-value">{{ opona.opona_uwagi }}</span>
+                                                            </div>
+                                                            {% endif %}
+                                                        </div>
                                                     </div>
                                                     {% endfor %}
                                                 </div>
-                                            </td>
-                                        </tr>
-                                        {% endif %}
-                                    {% endfor %}
-                                {% endif %}
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
                             </tbody>
                         </table>
                     </div>
                     
                     {% else %}
                     <div class="no-results">
-                        <p>❌ Brak opon na wybraną datę: <strong>{{ selected_date }}</strong></p>
-                        <p>Spróbuj wybrać inną datę z listy dostępnych dat powyżej.</p>
+                        <p>❌ Brak pojazdów na: <strong>{{ selected_date }}</strong></p>
+                        <p>Spróbuj wybrać inną datę z listy powyżej.</p>
                     </div>
                     {% endif %}
                 </div>
@@ -216,5 +183,22 @@
 
     <script src="/static/js/common.js"></script>
     <script src="/modules/magazyn/static/js/magazyn.js"></script>
+    <script>
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+        
+        function togglePojazd(rej) {
+            const group = document.querySelector(`[data-rej="${rej}"]`);
+            group.classList.toggle('expanded');
+        }
+    </script>
 </body>
 </html>

@@ -63,7 +63,7 @@ def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
             )
         )
         AND CAST(zp.data AS DATE) = :selected_date
-        ORDER BY kpo.id;
+        ORDER BY p.nrRejestracyjny, ko.numer, kpo.id;
     """)
     
     try:
@@ -72,7 +72,7 @@ def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
         
         print(f"🔍 Zapytanie zwróciło {len(rows)} rekordów dla daty {selected_date}")
         
-        # Konwersja wyników na listę słowników z obsługą Decimal
+        # Konwersja wyników
         opony_data = []
         for row in rows:
             opony_data.append({
@@ -83,9 +83,9 @@ def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
                 "bieznik": convert_decimal_to_float(row.bieznik),
                 "lokalizacja": row.lokalizacja,
                 "data": row.data.isoformat() if row.data else None,
-                "opona_uwagi": row.opona_uwagi,                    # ← NOWE
-                "karta_przechowywalni_uwagi": row.karta_przechowywalni_uwagi,  # ← NOWE
-                "numer_depozytu": row.numer_depozytu,              # ← NOWE (wcześniej 'numer')
+                "opona_uwagi": row.opona_uwagi,
+                "karta_przechowywalni_uwagi": row.karta_przechowywalni_uwagi,
+                "numer_depozytu": row.numer_depozytu,
                 "towary_szczegoly": row.towary_szczegoly,
                 "uslugi_szczegoly": row.uslugi_szczegoly
             })
@@ -95,6 +95,76 @@ def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
     except Exception as e:
         print(f"❌ Błąd podczas pobierania danych opon: {e}")
         return []
+
+def get_pojazdy_grouped_for_terminarz(db: Session, selected_date: str) -> List[Dict[str, Any]]:
+    """Grupuje pojazdy - jeden wiersz na pojazd z depozytami do rozwinięcia"""
+    
+    opony_data = get_opony_na_dzien(db, selected_date)
+    
+    # Grupuj według nr rejestracyjnego
+    grouped_vehicles = {}
+    
+    for opona in opony_data:
+        rej = opona['rej']
+        
+        if rej not in grouped_vehicles:
+            grouped_vehicles[rej] = {
+                'rej': rej,
+                'total_opony': 0,
+                'depozyty': {},  # Grupuj po numer_depozytu
+                'combined_info': {
+                    'wheels_summary': set(),
+                    'lokalizacje_summary': set(),
+                    'uwagi_summary': set()
+                }
+            }
+        
+        vehicle = grouped_vehicles[rej]
+        numer_depozytu = opona['numer_depozytu']
+        
+        # Dodaj do podsumowania pojazdu
+        if opona['wheels']:
+            vehicle['combined_info']['wheels_summary'].add(opona['wheels'])
+        if opona['lokalizacja']:
+            vehicle['combined_info']['lokalizacje_summary'].add(opona['lokalizacja'])
+        if opona['karta_przechowywalni_uwagi']:
+            vehicle['combined_info']['uwagi_summary'].add(opona['karta_przechowywalni_uwagi'])
+        
+        # Grupuj po depozytach
+        if numer_depozytu not in vehicle['depozyty']:
+            vehicle['depozyty'][numer_depozytu] = {
+                'numer_depozytu': numer_depozytu,
+                'karta_uwagi': opona['karta_przechowywalni_uwagi'],
+                'wheels': opona['wheels'],
+                'lokalizacja': opona['lokalizacja'],
+                'opony': [],
+                'towary_szczegoly': opona['towary_szczegoly'],
+                'uslugi_szczegoly': opona['uslugi_szczegoly']
+            }
+        
+        # Dodaj oponę do depozytu
+        vehicle['depozyty'][numer_depozytu]['opony'].append(opona)
+        vehicle['total_opony'] += 1
+    
+    # Konwertuj sets na stringi dla wyświetlania
+    result = []
+    for rej, vehicle in grouped_vehicles.items():
+        # Złącz unikalne wartości
+        wheels_str = " / ".join(sorted(vehicle['combined_info']['wheels_summary']))
+        lokalizacje_str = " / ".join(sorted(vehicle['combined_info']['lokalizacje_summary']))
+        uwagi_str = " / ".join(filter(None, sorted(vehicle['combined_info']['uwagi_summary'])))
+        
+        result.append({
+            'rej': rej,
+            'wheels_summary': wheels_str,
+            'lokalizacje_summary': lokalizacje_str,
+            'uwagi_summary': uwagi_str or "Brak uwag",
+            'total_opony': vehicle['total_opony'],
+            'depozyty_count': len(vehicle['depozyty']),
+            'depozyty': list(vehicle['depozyty'].values())
+        })
+    
+    return result
 
 def get_dostepne_daty_opon(db: Session, limit: int = 30) -> List[str]:
     """Pobiera dostępne daty z zapisami terminów (ostatnie 30 dni)"""
@@ -116,57 +186,4 @@ def get_dostepne_daty_opon(db: Session, limit: int = 30) -> List[str]:
         
     except Exception as e:
         print(f"Błąd podczas pobierania dostępnych dat: {e}")
-        return []
-
-# FUNKCJA DEBUGOWA - zachowana
-def debug_zapisy_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
-    """Funkcja debugowa - sprawdza podstawowe dane bez skomplikowanych JOIN-ów"""
-    
-    query = text("""
-        SELECT 
-            p.nrRejestracyjny AS rej,
-            zp.opis,
-            zp.data,
-            zp.id as zapisy_id,
-            k.id as kosztorys_id,
-            CASE WHEN k.id IS NOT NULL THEN 'MA_KOSZTORYS' ELSE 'BRAK_KOSZTORYSU' END as status_kosztorysu
-        FROM ZapisyTerminarzy zp
-        INNER JOIN Pojazdy p ON p.id = zp.idPojazdy
-        LEFT JOIN Kosztorysy k ON k.id = zp.idKosztorysy
-        WHERE CAST(zp.data AS DATE) = :selected_date
-        ORDER BY p.nrRejestracyjny
-    """)
-    
-    try:
-        result = db.execute(query, {"selected_date": selected_date})
-        rows = result.fetchall()
-        
-        print(f"🔍 DEBUGOWANIE dla daty {selected_date}:")
-        print(f"📊 Znaleziono {len(rows)} zapisów terminów")
-        
-        z_kosztorysami = sum(1 for row in rows if row.kosztorys_id is not None)
-        bez_kosztorysow = len(rows) - z_kosztorysami
-        
-        print(f"💰 Z kosztorysami: {z_kosztorysami}")
-        print(f"❌ Bez kosztorysów: {bez_kosztorysow}")
-        
-        for row in rows:
-            print(f"  - {row.rej}: {row.opis} ({row.status_kosztorysu})")
-        
-        # Konwersja z obsługą typów danych
-        debug_data = []
-        for row in rows:
-            debug_data.append({
-                "rej": row.rej,
-                "opis": row.opis,
-                "data": row.data.isoformat() if row.data else None,
-                "zapisy_id": row.zapisy_id,
-                "kosztorys_id": row.kosztorys_id,
-                "status_kosztorysu": row.status_kosztorysu
-            })
-        
-        return debug_data
-        
-    except Exception as e:
-        print(f"❌ Błąd debugowania: {e}")
         return []

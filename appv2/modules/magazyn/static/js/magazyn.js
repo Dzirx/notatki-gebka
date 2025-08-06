@@ -121,6 +121,25 @@ function setupAutoSubmit() {
     }
 }
 
+// FUNKCJA ZAKŁADEK
+function switchTab(tabName) {
+    // Ukryj wszystkie zakładki
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Usuń aktywność z przycisków
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Pokaż wybraną zakładkę
+    document.getElementById(tabName).classList.add('active');
+    
+    // Aktywuj przycisk
+    event.target.classList.add('active');
+}
+
 // Funkcja do formatowania dat
 function formatPolishDate(dateString) {
     const date = new Date(dateString);
@@ -190,10 +209,11 @@ function showNotification(message, type = 'info') {
     // TODO: Dodać prawdziwy system powiadomień
 }
 
-// Export funkcji dla innych skryptów
+// EXPORT FUNKCJI - JEDNA DEFINICJA
 window.MagazynUtils = {
     formatPolishDate,
     exportToCSV,
     showNotification,
-    fillTable
+    fillTable,
+    switchTab
 };

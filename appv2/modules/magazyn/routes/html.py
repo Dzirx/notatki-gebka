@@ -5,6 +5,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from database import get_samochody_db
 from datetime import datetime, date
+from typing import Optional
 import sys
 import os
 
@@ -21,32 +22,59 @@ templates = Jinja2Templates(directory="modules/magazyn/templates")
 
 @router.get("/", response_class=HTMLResponse)
 async def magazyn_home(request: Request, db: Session = Depends(get_samochody_db)):
-    """Strona główna modułu magazyn - kalendarz opon"""
+    """Strona główna modułu magazyn z zakładkami"""
     
-    # Pobierz dostępne daty
-    dostepne_daty = crud.get_dostepne_daty_opon(db)
     dzisiejsza_data = datetime.now().strftime('%Y-%m-%d')
     
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "dostepne_daty": dostepne_daty,
         "dzisiejsza_data": dzisiejsza_data,
-        "opony_data": [],
-        "selected_date": None
+        "pojazdy_grouped": [],
+        "selected_date": None,
+        "active_tab": "zlecenia"  # Domyślna zakładka
     })
 
 @router.post("/", response_class=HTMLResponse) 
-async def magazyn_search(request: Request, selected_date: str = Form(...), db: Session = Depends(get_samochody_db)):
-    """Wyszukiwanie opon na wybrany dzień"""
+async def magazyn_search(
+    request: Request, 
+    selected_date: str = Form(...),
+    tab: Optional[str] = Form("terminarz"),
+    db: Session = Depends(get_samochody_db)
+):
+    """Wyszukiwanie w wybranej zakładce"""
     
-    # Pobierz dane opon na wybrany dzień
-    opony_data = crud.get_opony_na_dzien(db, selected_date)
-    dostepne_daty = crud.get_dostepne_daty_opon(db)
+    dzisiejsza_data = datetime.now().strftime('%Y-%m-%d')
     
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "dostepne_daty": dostepne_daty,
-        "dzisiejsza_data": datetime.now().strftime('%Y-%m-%d'),
-        "opony_data": opony_data,
-        "selected_date": selected_date
-    })
+    if tab == "terminarz":
+        # Pobierz pogrupowane dane dla terminarz
+        pojazdy_grouped = crud.get_pojazdy_grouped_for_terminarz(db, selected_date)
+        
+        return templates.TemplateResponse("index.html", {
+            "request": request,
+            "dzisiejsza_data": dzisiejsza_data,
+            "pojazdy_grouped": pojazdy_grouped,
+            "selected_date": selected_date,
+            "active_tab": "terminarz"
+        })
+    
+    elif tab == "zlecenia":
+        # TODO: Implementacja zleceń
+        return templates.TemplateResponse("index.html", {
+            "request": request,
+            "dzisiejsza_data": dzisiejsza_data,
+            "pojazdy_grouped": [],
+            "selected_date": selected_date,
+            "active_tab": "zlecenia"
+        })
+    
+    else:
+        # Fallback na terminarz
+        pojazdy_grouped = crud.get_pojazdy_grouped_for_terminarz(db, selected_date)
+        
+        return templates.TemplateResponse("index.html", {
+            "request": request,
+            "dzisiejsza_data": dzisiejsza_data,
+            "pojazdy_grouped": pojazdy_grouped,
+            "selected_date": selected_date,
+            "active_tab": "terminarz"
+        })

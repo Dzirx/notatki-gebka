@@ -38,40 +38,45 @@ function fillTable() {
     console.log('📊 Tabela będzie wypełniona przez server-side rendering');
 }
 
+// FUNKCJA ROZWIJANIA POJAZDÓW (NOWA)
+function togglePojazd(rej) {
+    const detailsRow = document.querySelector(`.pojazd-details[data-rej="${rej}"]`);
+    const icon = document.querySelector(`.vehicle-header[onclick*="${rej}"] .expand-icon`);
+    
+    if (detailsRow.style.display === 'none' || !detailsRow.style.display) {
+        detailsRow.style.display = 'table-row';
+        icon.textContent = '▲';
+    } else {
+        detailsRow.style.display = 'none';
+        icon.textContent = '▼';
+    }
+}
+
+// FUNKCJA ZAKŁADEK
+function switchTab(tabName) {
+    // Ukryj wszystkie zakładki
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Usuń aktywność z przycisków
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Pokaż wybraną zakładkę
+    document.getElementById(tabName).classList.add('active');
+    
+    // Aktywuj przycisk
+    event.target.classList.add('active');
+}
+
 // Funkcja do generowania klasy bieżnika
 function getBieznikClass(bieznik) {
     const val = parseFloat(bieznik);
     if (val >= 6) return 'bieznik-good';
     if (val >= 3) return 'bieznik-medium';
     return 'bieznik-poor';
-}
-
-// Funkcja do zbierania towarów i usług dla pojazdu
-function getTowyaryUslugiForVehicle(opony) {
-    const kosztorysy = {};
-    
-    opony.forEach(opona => {
-        if (opona.towary_szczegoly || opona.uslugi_szczegoly) {
-            const numer = opona.numer || 'Brak numeru';
-            if (!kosztorysy[numer]) {
-                kosztorysy[numer] = {
-                    numer: numer,
-                    towary: null,
-                    uslugi: null
-                };
-            }
-            
-            if (opona.towary_szczegoly && !kosztorysy[numer].towary) {
-                kosztorysy[numer].towary = opona.towary_szczegoly;
-            }
-            
-            if (opona.uslugi_szczegoly && !kosztorysy[numer].uslugi) {
-                kosztorysy[numer].uslugi = opona.uslugi_szczegoly;
-            }
-        }
-    });
-    
-    return Object.values(kosztorysy);
 }
 
 // Obsługa szybkich przycisków dat
@@ -119,25 +124,6 @@ function setupAutoSubmit() {
             // this.closest('form').submit();
         });
     }
-}
-
-// FUNKCJA ZAKŁADEK
-function switchTab(tabName) {
-    // Ukryj wszystkie zakładki
-    document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.remove('active');
-    });
-    
-    // Usuń aktywność z przycisków
-    document.querySelectorAll('.tab-button').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    
-    // Pokaż wybraną zakładkę
-    document.getElementById(tabName).classList.add('active');
-    
-    // Aktywuj przycisk
-    event.target.classList.add('active');
 }
 
 // Funkcja do formatowania dat
@@ -215,5 +201,6 @@ window.MagazynUtils = {
     exportToCSV,
     showNotification,
     fillTable,
-    switchTab
+    switchTab,
+    togglePojazd
 };

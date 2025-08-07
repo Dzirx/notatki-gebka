@@ -94,21 +94,6 @@
     display: block;
 }
 
-/* STATS */
-.stats-info {
-    background: #f8f9fa;
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    border-left: 4px solid #27ae60;
-}
-
-.stats-info p {
-    margin: 0;
-    color: #2c3e50;
-    font-weight: 500;
-}
-
 /* GŁÓWNA TABELA */
 .table-responsive {
     overflow-x: auto;
@@ -165,93 +150,63 @@
 }
 
 .pojazd-details td {
-    padding: 0 !important;
+    padding: 20px !important;
     border: none !important;
-}
-
-.pojazd-content {
-    padding: 20px;
-}
-
-/* SEKCJA INFORMACJI DEPOZYTU */
-.info-section {
-    background: white;
-    margin-bottom: 15px;
-    padding: 15px;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
-}
-
-.info-section h4 {
-    color: #495057;
-    margin-bottom: 10px;
-    border-bottom: 1px solid #e9ecef;
-    padding-bottom: 5px;
-}
-
-.info-section p {
-    margin: 5px 0;
-    font-size: 0.9rem;
-    color: #6c757d;
 }
 
 /* TABELA OPON SZCZEGÓŁOWA */
 .opony-table-details {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 10px;
+    margin: 15px 0;
     background: white;
-    border-radius: 6px;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #ddd;
 }
 
 .opony-table-details th {
     background: #6c757d;
     color: white;
-    padding: 10px 8px;
-    font-size: 0.9em;
+    padding: 12px;
     font-weight: 600;
     text-align: left;
-    border: none;
+    border: 1px solid #ddd;
 }
 
 .opony-table-details td {
-    border: 1px solid #dee2e6;
-    padding: 8px;
-    font-size: 0.9em;
+    border: 1px solid #ddd;
+    padding: 10px;
     vertical-align: middle;
 }
 
-.opony-table-details tr:nth-child(even) {
+.opony-table-details tbody tr:nth-child(even) {
     background: #f8f9fa;
 }
 
-.opony-table-details tr:hover {
+.opony-table-details tbody tr:hover {
     background: #e9ecef;
 }
 
-/* BIEŻNIK VALUES */
-.bieznik-value {
-    padding: 3px 8px;
-    border-radius: 12px;
-    color: white;
-    font-size: 0.8rem;
-    font-weight: bold;
-    display: inline-block;
+/* SEKCJA INFORMACJI DEPOZYTU */
+.depozyt-info {
+    background: white;
+    margin: 15px 0;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
 }
 
-.bieznik-good { 
-    background: #28a745; 
+.depozyt-info p {
+    margin: 8px 0;
+    font-size: 0.9rem;
+    color: #6c757d;
 }
 
-.bieznik-medium { 
-    background: #ffc107; 
-    color: #212529; 
-}
-
-.bieznik-poor { 
-    background: #dc3545; 
+/* TYTUŁ DEPOZYTU */
+h4 {
+    color: #495057;
+    margin: 20px 0 10px 0;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 5px;
 }
 
 /* NO RESULTS */
@@ -288,17 +243,13 @@
     
     .opony-table-details th,
     .opony-table-details td {
-        padding: 6px 4px;
-        font-size: 0.8em;
+        padding: 8px 6px;
+        font-size: 0.9em;
     }
     
     .tab-button {
         padding: 12px 15px;
         font-size: 14px;
-    }
-    
-    .pojazd-content {
-        padding: 15px;
     }
 }
 
@@ -316,7 +267,7 @@
         font-size: 11px;
     }
     
-    .info-section {
+    .depozyt-info {
         padding: 10px;
     }
 }

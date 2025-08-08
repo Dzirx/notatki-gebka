@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_samochody_db
+from datetime import datetime
 import sys
 import os
 
@@ -12,10 +13,22 @@ from modules.magazyn import crud
 
 router = APIRouter()
 
+@router.get("/dzisiejsze-zlecenia")
+def get_dzisiejsze_zlecenia_api(db: Session = Depends(get_samochody_db)):
+    """API: dzisiejsze rozpoczęte zlecenia (dla widoku Zlecenia na dziś)."""
+    try:
+        zlecenia = crud.get_dzisiejsze_rozpoczete_zlecenia(db)
+        return {
+            "success": True,
+            "zlecenia": zlecenia,
+            "timestamp": datetime.now().isoformat(timespec="seconds")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Błąd podczas pobierania zleceń: {str(e)}")
+
 @router.get("/opony/{date}")
 def get_opony_na_dzien_api(date: str, db: Session = Depends(get_samochody_db)):
-    """API endpoint do pobierania opon na wybrany dzień"""
-    
+    """API: pobieranie opon na wybrany dzień."""
     try:
         opony_data = crud.get_opony_na_dzien(db, date)
         return {
@@ -28,8 +41,7 @@ def get_opony_na_dzien_api(date: str, db: Session = Depends(get_samochody_db)):
 
 @router.get("/daty")
 def get_dostepne_daty_api(db: Session = Depends(get_samochody_db)):
-    """API endpoint do pobierania dostępnych dat"""
-    
+    """API: listowanie dostępnych dat (dla opon)."""
     try:
         daty = crud.get_dostepne_daty_opon(db)
         return {

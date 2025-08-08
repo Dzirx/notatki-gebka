@@ -94,6 +94,21 @@
     display: block;
 }
 
+/* STATS */
+.stats-info {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #27ae60;
+}
+
+.stats-info p {
+    margin: 0;
+    color: #2c3e50;
+    font-weight: 500;
+}
+
 /* GŁÓWNA TABELA */
 .table-responsive {
     overflow-x: auto;
@@ -150,63 +165,93 @@
 }
 
 .pojazd-details td {
-    padding: 20px !important;
+    padding: 0 !important;
     border: none !important;
+}
+
+.pojazd-content {
+    padding: 20px;
+}
+
+/* SEKCJA INFORMACJI DEPOZYTU */
+.info-section {
+    background: white;
+    margin-bottom: 15px;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.info-section h4 {
+    color: #495057;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 5px;
+}
+
+.info-section p {
+    margin: 5px 0;
+    font-size: 0.9rem;
+    color: #6c757d;
 }
 
 /* TABELA OPON SZCZEGÓŁOWA */
 .opony-table-details {
     width: 100%;
     border-collapse: collapse;
-    margin: 15px 0;
+    margin-top: 10px;
     background: white;
-    border: 1px solid #ddd;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .opony-table-details th {
     background: #6c757d;
     color: white;
-    padding: 12px;
+    padding: 10px 8px;
+    font-size: 0.9em;
     font-weight: 600;
     text-align: left;
-    border: 1px solid #ddd;
+    border: none;
 }
 
 .opony-table-details td {
-    border: 1px solid #ddd;
-    padding: 10px;
+    border: 1px solid #dee2e6;
+    padding: 8px;
+    font-size: 0.9em;
     vertical-align: middle;
 }
 
-.opony-table-details tbody tr:nth-child(even) {
+.opony-table-details tr:nth-child(even) {
     background: #f8f9fa;
 }
 
-.opony-table-details tbody tr:hover {
+.opony-table-details tr:hover {
     background: #e9ecef;
 }
 
-/* SEKCJA INFORMACJI DEPOZYTU */
-.depozyt-info {
-    background: white;
-    margin: 15px 0;
-    padding: 15px;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
+/* BIEŻNIK VALUES */
+.bieznik-value {
+    padding: 3px 8px;
+    border-radius: 12px;
+    color: white;
+    font-size: 0.8rem;
+    font-weight: bold;
+    display: inline-block;
 }
 
-.depozyt-info p {
-    margin: 8px 0;
-    font-size: 0.9rem;
-    color: #6c757d;
+.bieznik-good { 
+    background: #28a745; 
 }
 
-/* TYTUŁ DEPOZYTU */
-h4 {
-    color: #495057;
-    margin: 20px 0 10px 0;
-    border-bottom: 2px solid #007bff;
-    padding-bottom: 5px;
+.bieznik-medium { 
+    background: #ffc107; 
+    color: #212529; 
+}
+
+.bieznik-poor { 
+    background: #dc3545; 
 }
 
 /* NO RESULTS */
@@ -229,6 +274,34 @@ h4 {
     color: #e74c3c;
 }
 
+/* PRZYCISK ODSWIEŻ (lekka kosmetyka, używa .btn-primary z globali) */
+#refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* SEKCJA PODSUMOWAŃ POD TABELĄ (Towary + Notatki per pojazd) */
+#car-summary .results-container {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 15px 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    border: 1px solid #eef1f4;
+}
+
+#car-summary h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #34495e;
+}
+
+#car-summary p {
+    margin: 4px 0;
+    font-size: 0.9rem;
+    color: #555;
+}
+
 /* RESPONSIVE */
 @media (max-width: 768px) {
     .date-search-form {
@@ -243,13 +316,17 @@ h4 {
     
     .opony-table-details th,
     .opony-table-details td {
-        padding: 8px 6px;
-        font-size: 0.9em;
+        padding: 6px 4px;
+        font-size: 0.8em;
     }
     
     .tab-button {
         padding: 12px 15px;
         font-size: 14px;
+    }
+    
+    .pojazd-content {
+        padding: 15px;
     }
 }
 
@@ -267,7 +344,7 @@ h4 {
         font-size: 11px;
     }
     
-    .depozyt-info {
+    .info-section {
         padding: 10px;
     }
 }

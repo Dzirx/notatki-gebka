@@ -187,3 +187,82 @@ def get_dostepne_daty_opon(db: Session, limit: int = 30) -> List[str]:
     except Exception as e:
         print(f"Błąd podczas pobierania dostępnych dat: {e}")
         return []
+    
+def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
+    """
+    Zlecenia rozpoczęte na wskazany dzień (YYYY-MM-DD).
+    To samo co 'get_dzisiejsze_rozpoczete_zlecenia', ale z parametrem daty.
+    """
+    query = text("""
+        SELECT 
+            p.nrRejestracyjny as rej,
+            z.dataGodzinaZgloszenia as data_zgloszenia,
+            kpo.nazwa AS name,
+            ko.felgiOpon AS wheels,
+            ko.rodzajDepozytu AS rodzaj_opony,
+            kpo.glebokoscBieznika AS bieznik,
+            ko.lokalizacjeOpon as lokalizacja,
+            kpo.wymianaOpis as opisOponyKPO,
+            ko.uwagi as kartaprzechowywalniuwagi,
+            ko.numer as numer,
+            z.idDokSprzedazy as dok,
+            nds.tresc as notatka,
+            t.nrKatalogowyBK as numer_katalogowy,
+            STUFF((SELECT DISTINCT ', ' + t2.nazwa + ' ' + CAST(tds2.ilosc as varchar) + ' szt'
+                   FROM TowaryDokSprzedazy tds2 
+                   INNER JOIN Towary t2 ON tds2.idTowary = t2.id
+                   INNER JOIN DokSprzedazy ds2 ON tds2.idDokSprzedazy = ds2.id
+                   INNER JOIN KosztorysyDokSprzedazy kds2 ON ds2.id = kds2.idDokSprzedazy
+                   INNER JOIN Kosztorysy kosz2 ON kosz2.id = kds2.idKosztorysy
+                   WHERE kosz2.idPojazdy = p.id
+                   FOR XML PATH('')), 1, 2, '') as towary_szczegoly,
+            STUFF((SELECT DISTINCT ', ' + u2.nazwa
+                   FROM UslugiDokSprzedazy uds2 
+                   INNER JOIN Uslugi u2 ON uds2.idUslugi = u2.id
+                   INNER JOIN DokSprzedazy ds3 ON uds2.idDokSprzedazy = ds3.id
+                   INNER JOIN KosztorysyDokSprzedazy kds3 ON ds3.id = kds3.idDokSprzedazy
+                   INNER JOIN Kosztorysy kosz3 ON kosz3.id = kds3.idKosztorysy
+                   WHERE kosz3.idPojazdy = p.id
+                   FOR XML PATH('')), 1, 2, '') as uslugi_szczegoly
+        FROM zlecenia z 
+        INNER JOIN Kontrahenci k ON z.idKontrahenci = k.id
+        INNER JOIN Pojazdy p ON p.id = z.idPojazdy 
+        LEFT JOIN DokSprzedazy ds ON ds.id = z.idDokSprzedazy
+        LEFT JOIN NotatkiDokSprzedazy nds ON nds.idDokSprzedazy = ds.id
+        LEFT JOIN TowaryDokSprzedazy tds on ds.id = tds.idDokSprzedazy
+        LEFT JOIN Towary t on t.id = tds.idTowary
+        LEFT JOIN KartyPrzechowalniOpon ko ON ko.idPojazdy = p.id
+        LEFT JOIN OponyKPO kpo ON kpo.idKartyPrzechowalniOpon = ko.id
+        LEFT JOIN Felgi f ON kpo.idFelgi = f.id
+        LEFT JOIN StanyOpon so ON kpo.idStanyOpon = so.id
+        LEFT JOIN ProducenciOpon po ON kpo.idProducenciOpon = po.id
+        WHERE ko.numer IS NOT NULL
+          AND CAST(z.dataGodzinaZgloszenia AS DATE) = :selected_date
+          AND z.idStatusyZlecen = 2
+        ORDER BY z.dataGodzinaZgloszenia DESC, p.nrRejestracyjny ASC
+    """)
+    try:
+        rows = db.execute(query, {"selected_date": selected_date}).fetchall()
+        data = []
+        for row in rows:
+            data.append({
+                "rej": row.rej,
+                "data_zgloszenia": row.data_zgloszenia,
+                "name": row.name,
+                "wheels": row.wheels,
+                "rodzaj_opony": row.rodzaj_opony,
+                "bieznik": convert_decimal_to_float(row.bieznik) if row.bieznik else None,
+                "lokalizacja": row.lokalizacja,
+                "opisOponyKPO": row.opisOponyKPO,
+                "kartaprzechowywalniuwagi": row.kartaprzechowywalniuwagi,
+                "numer": row.numer,
+                "dok": row.dok,
+                "notatka": row.notatka,
+                "numer_katalogowy": row.numer_katalogowy,
+                "towary_szczegoly": row.towary_szczegoly,
+                "uslugi_szczegoly": row.uslugi_szczegoly,
+            })
+        return data
+    except Exception as e:
+        print(f"❌ Błąd get_zlecenia_na_dzien: {e}")
+        return []

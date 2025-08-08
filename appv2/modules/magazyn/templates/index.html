@@ -56,7 +56,7 @@
                             <thead>
                                 <tr>
                                     <th>Nr Rejestracyjny</th>
-                                    <th>Opony do wydania</th>
+                                    <th>Do wydania</th>
                                     <th>Lokalizacje</th>
                                     <th>Notatka</th>
                                 </tr>
@@ -65,14 +65,39 @@
                                 {% for pojazd in pojazdy_zlecenia_grouped %}
                                 <tr class="vehicle-header" onclick="togglePojazd('zlecenie_{{ pojazd.rej }}')" style="cursor: pointer;">
                                     <td><strong>{{ pojazd.rej }}</strong></td>
-                                    <td>{{ pojazd.opony_count }} opon</td>
-                                    <td>{{ pojazd.lokalizacje_summary }}</td>
+                                    <td>
+                                        {% if pojazd.ma_tylko_towary %}
+                                            <div style="color: #007bff; font-weight: bold;">📦 Towary:</div>
+                                        {% else %}
+                                            <div style="font-size: 0.9em; color: #6c757d;">
+                                                {% for depozyt in pojazd.depozyty %}
+                                                    {{ depozyt.numer_depozytu }} <br>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if pojazd.ma_tylko_towary %}
+                                            <span style="color: #6c757d;">-</span>
+                                        {% else %}
+                                            <div style="font-size: 0.9em;">
+                                                {{ pojazd.lokalizacje_summary|replace(' / ', '<br>')|safe }}
+                                            </div>
+                                        {% endif %}
+                                    </td>
                                     <td>{{ pojazd.notatka or "-" }}</td>
                                 </tr>
                                 
                                 <tr class="pojazd-details" data-rej="zlecenie_{{ pojazd.rej }}" style="display: none;">
                                     <td colspan="4">
                                         <div class="pojazd-details-content">
+                                            
+                                            {% if pojazd.ma_tylko_towary %}
+                                            <!-- ZLECENIE TYLKO Z TOWARAMI -->
+                                            <h4>📦 Zlecenie bez opon - tylko towary</h4>
+                                            
+                                            {% else %}
+                                            <!-- ZLECENIE Z OPONAMI -->
                                             <h4>🔍 Szczegóły opon do wydania</h4>
                                             
                                             {% for depozyt in pojazd.depozyty %}
@@ -113,6 +138,7 @@
                                                 </table>
                                             </div>
                                             {% endfor %}
+                                            {% endif %}
 
                                             {% if pojazd.towary_szczegoly %}
                                             <div class="depozyt-info" style="margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 5px;">

@@ -190,11 +190,13 @@ def get_dostepne_daty_opon(db: Session, limit: int = 30) -> List[str]:
     
 def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
     """
-    Zlecenia rozpoczęte na wskazany dzień (YYYY-MM-DD).
-    Łączy dane opon z towarami/usługami z oddzielnych zapytań.
+    Zlecenia rozpoczęte na wskazany dzień.
+    ZAPYTANIE 1: Opony z notatkami
+    ZAPYTANIE 2: Towary/Usługi wszystkich zleceń
+    ZAPYTANIE 3: Zlecenia które mają tylko towary (bez notatek/opon)
     """
     
-    # ZAPYTANIE 1: Opony (bez towarów/usług)
+    # ZAPYTANIE 1: Opony (tylko te z notatkami)
     query_opony = text("""
         SELECT 
             p.nrRejestracyjny as rej,
@@ -205,8 +207,9 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
             ko.lokalizacjeOpon as lokalizacja,
             kpo.wymianaOpis as opisOponyKPO,
             ko.uwagi as kartaprzechowywalniuwagi,
+            ko.numer as numer_z_karty,
             nds.tresc as notatka,
-            ko.numer as numer_z_karty
+            'opony' as typ_rekordu
         FROM zlecenia z 
         INNER JOIN Kontrahenci k ON z.idKontrahenci = k.id
         INNER JOIN Pojazdy p ON p.id = z.idPojazdy 
@@ -214,9 +217,6 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
         LEFT JOIN NotatkiDokSprzedazy nds ON nds.idDokSprzedazy = ds.id
         LEFT JOIN KartyPrzechowalniOpon ko ON ko.idPojazdy = p.id
         LEFT JOIN OponyKPO kpo ON kpo.idKartyPrzechowalniOpon = ko.id
-        LEFT JOIN Felgi f ON kpo.idFelgi = f.id
-        LEFT JOIN StanyOpon so ON kpo.idStanyOpon = so.id
-        LEFT JOIN ProducenciOpon po ON kpo.idProducenciOpon = po.id
         WHERE
             ko.numer IS NOT NULL
             AND nds.tresc IS NOT NULL
@@ -253,10 +253,42 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
             )
             AND CAST(z.dataGodzinaZgloszenia AS DATE) = :selected_date
             AND z.idStatusyZlecen = 2
-        ORDER BY z.dataGodzinaZgloszenia DESC, p.nrRejestracyjny ASC
     """)
     
-    # ZAPYTANIE 2: Towary/Usługi per pojazd
+    # ZAPYTANIE 2: Zlecenia bez notatek ale z towarami (tylko towary)
+    query_tylko_towary = text("""
+        SELECT 
+            p.nrRejestracyjny as rej,
+            NULL as name,
+            NULL as wheels,
+            NULL as rodzaj_opony,
+            NULL as bieznik,
+            NULL as lokalizacja,
+            NULL as opisOponyKPO,
+            NULL as kartaprzechowywalniuwagi,
+            NULL as numer_z_karty,
+            nds.tresc as notatka,
+            'tylko_towary' as typ_rekordu
+        FROM zlecenia z 
+        INNER JOIN Kontrahenci k ON z.idKontrahenci = k.id
+        INNER JOIN Pojazdy p ON p.id = z.idPojazdy 
+        LEFT JOIN DokSprzedazy ds ON ds.id = z.idDokSprzedazy
+        LEFT JOIN NotatkiDokSprzedazy nds ON nds.idDokSprzedazy = ds.id
+        WHERE
+            CAST(z.dataGodzinaZgloszenia AS DATE) = :selected_date
+            AND z.idStatusyZlecen = 2
+            AND (nds.tresc IS NULL OR nds.tresc = '' OR CHARINDEX('/', CAST(nds.tresc AS varchar(500))) = 0)
+            AND EXISTS (
+                SELECT 1 
+                FROM DokSprzedazy ds2
+                LEFT JOIN TowaryDokSprzedazy tds2 ON tds2.idDokSprzedazy = ds2.id
+                LEFT JOIN UslugiDokSprzedazy uds2 ON uds2.idDokSprzedazy = ds2.id
+                WHERE ds2.id = z.idDokSprzedazy 
+                AND (tds2.id IS NOT NULL OR uds2.id IS NOT NULL)
+            )
+    """)
+    
+    # ZAPYTANIE 3: Towary/Usługi wszystkich zleceń
     query_towary_uslugi = text("""
         SELECT 
             p.nrRejestracyjny as rej,
@@ -275,13 +307,14 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
     """)
     
     try:
-        # Wykonaj oba zapytania
+        # Wykonaj wszystkie zapytania
         opony_rows = db.execute(query_opony, {"selected_date": selected_date}).fetchall()
+        towary_only_rows = db.execute(query_tylko_towary, {"selected_date": selected_date}).fetchall()
         towary_rows = db.execute(query_towary_uslugi, {"selected_date": selected_date}).fetchall()
         
-        print(f"🔍 Opony: {len(opony_rows)} rekordów, Towary/Usługi: {len(towary_rows)} pojazdów")
+        print(f"🔍 Opony: {len(opony_rows)}, Tylko towary: {len(towary_only_rows)}, Towary/Usługi: {len(towary_rows)}")
         
-        # Twórz słownik towarów/usług po nr rejestracyjnym
+        # Słownik towarów/usług
         towary_dict = {}
         for row in towary_rows:
             towary_dict[row.rej] = {
@@ -289,8 +322,10 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
                 'uslugi_szczegoly': row.uslugi_szczegoly
             }
         
-        # Łącz dane opon z towarami/usługami
+        # Łącz wszystkie dane
         data = []
+        
+        # Dodaj opony z notatkami
         for row in opony_rows:
             rej = row.rej
             towary_info = towary_dict.get(rej, {'towary_szczegoly': None, 'uslugi_szczegoly': None})
@@ -307,7 +342,29 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
                 "numer_z_karty": row.numer_z_karty,
                 "notatka": row.notatka,
                 "towary_szczegoly": towary_info['towary_szczegoly'],
-                "uslugi_szczegoly": towary_info['uslugi_szczegoly']
+                "uslugi_szczegoly": towary_info['uslugi_szczegoly'],
+                "typ_rekordu": "opony"
+            })
+        
+        # Dodaj zlecenia tylko z towarami (bez opon)
+        for row in towary_only_rows:
+            rej = row.rej
+            towary_info = towary_dict.get(rej, {'towary_szczegoly': None, 'uslugi_szczegoly': None})
+            
+            data.append({
+                "rej": rej,
+                "name": None,
+                "wheels": None,
+                "rodzaj_opony": None,
+                "bieznik": None,
+                "lokalizacja": None,
+                "opisOponyKPO": None,
+                "kartaprzechowywalniuwagi": None,
+                "numer_z_karty": None,
+                "notatka": row.notatka,
+                "towary_szczegoly": towary_info['towary_szczegoly'],
+                "uslugi_szczegoly": towary_info['uslugi_szczegoly'],
+                "typ_rekordu": "tylko_towary"
             })
         
         return data
@@ -318,7 +375,7 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
 
 def get_pojazdy_zlecenia_grouped(db: Session, selected_date: str) -> List[Dict[str, Any]]:
     """
-    Grupuje zlecenia - jeden wiersz na pojazd z oponami pogrupowanymi według depozytów
+    Grupuje zlecenia - obsługuje opony z notatkami i zlecenia tylko z towarami
     """
     
     zlecenia_data = get_zlecenia_na_dzien(db, selected_date)
@@ -326,56 +383,66 @@ def get_pojazdy_zlecenia_grouped(db: Session, selected_date: str) -> List[Dict[s
     # Grupuj według nr rejestracyjnego
     grouped_vehicles = {}
     
-    for opona in zlecenia_data:
-        rej = opona['rej']
+    for rekord in zlecenia_data:
+        rej = rekord['rej']
         
         # Inicjalizuj pojazd jeśli nie istnieje
         if rej not in grouped_vehicles:
             grouped_vehicles[rej] = {
                 'rej': rej,
-                'notatka': opona['notatka'],
-                'towary_szczegoly': opona['towary_szczegoly'],
-                'uslugi_szczegoly': opona['uslugi_szczegoly'],
-                'depozyty': {},  # Grupuj według numer_z_karty
-                'lokalizacje_set': set()
+                'notatka': rekord['notatka'],
+                'towary_szczegoly': rekord['towary_szczegoly'],
+                'uslugi_szczegoly': rekord['uslugi_szczegoly'],
+                'depozyty': {},  # Dla opon
+                'lokalizacje_set': set(),
+                'ma_opony': False,
+                'ma_tylko_towary': False
             }
         
         vehicle = grouped_vehicles[rej]
         
-        # Zbieraj unikalne lokalizacje
-        if opona['lokalizacja']:
-            vehicle['lokalizacje_set'].add(opona['lokalizacja'])
-        
-        # Grupuj opony według numeru depozytu
-        # UWAGA: Musisz dodać numer_z_karty do zapytania query_opony!
-        numer_depozytu = opona.get('numer_z_karty', 'Nieznany')
-        
-        if numer_depozytu not in vehicle['depozyty']:
-            vehicle['depozyty'][numer_depozytu] = {
-                'numer_depozytu': numer_depozytu,
-                'opony': []
-            }
-        
-        # Dodaj oponę do odpowiedniego depozytu
-        vehicle['depozyty'][numer_depozytu]['opony'].append(opona)
+        if rekord['typ_rekordu'] == 'opony':
+            # To jest opona - dodaj do depozytów
+            vehicle['ma_opony'] = True
+            
+            # Zbieraj lokalizacje
+            if rekord['lokalizacja']:
+                vehicle['lokalizacje_set'].add(rekord['lokalizacja'])
+            
+            # Grupuj według depozytu
+            numer_depozytu = rekord['numer_z_karty']
+            if numer_depozytu not in vehicle['depozyty']:
+                vehicle['depozyty'][numer_depozytu] = {
+                    'numer_depozytu': numer_depozytu,
+                    'opony': []
+                }
+            
+            vehicle['depozyty'][numer_depozytu]['opony'].append(rekord)
+            
+        elif rekord['typ_rekordu'] == 'tylko_towary':
+            # To jest zlecenie tylko z towarami
+            vehicle['ma_tylko_towary'] = True
     
     # Konwertuj na listę wyników
     result = []
     for rej, vehicle in grouped_vehicles.items():
         lokalizacje_summary = " / ".join(sorted(vehicle['lokalizacje_set']))
         
-        # Policz łączną liczbę opon
-        total_opony = sum(len(depot['opony']) for depot in vehicle['depozyty'].values())
-        
-        # Konwertuj depozyty na listę posortowaną
-        depozyty_list = [
-            {
-                'numer_depozytu': depot_num,
-                'opony_count': len(depot_data['opony']),
-                'opony': depot_data['opony']
-            }
-            for depot_num, depot_data in vehicle['depozyty'].items()
-        ]
+        if vehicle['ma_opony']:
+            # Ma opony - policz je
+            total_opony = sum(len(depot['opony']) for depot in vehicle['depozyty'].values())
+            depozyty_list = [
+                {
+                    'numer_depozytu': depot_num,
+                    'opony_count': len(depot_data['opony']),
+                    'opony': depot_data['opony']
+                }
+                for depot_num, depot_data in vehicle['depozyty'].items()
+            ]
+        else:
+            # Tylko towary - brak opon
+            total_opony = 0
+            depozyty_list = []
         
         result.append({
             'rej': rej,
@@ -385,7 +452,8 @@ def get_pojazdy_zlecenia_grouped(db: Session, selected_date: str) -> List[Dict[s
             'notatka': vehicle['notatka'],
             'towary_szczegoly': vehicle['towary_szczegoly'],
             'uslugi_szczegoly': vehicle['uslugi_szczegoly'],
-            'depozyty': sorted(depozyty_list, key=lambda x: x['numer_depozytu'])
+            'depozyty': sorted(depozyty_list, key=lambda x: x['numer_depozytu']) if depozyty_list else [],
+            'ma_tylko_towary': vehicle['ma_tylko_towary']
         })
     
     return sorted(result, key=lambda x: x['rej'])

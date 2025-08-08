@@ -14,16 +14,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Obsługa przycisku "🔄 Odśwież"
-    const refreshBtn = document.getElementById('refresh-btn');
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', odswiez);
+    const refreshZleceniaBtn = document.getElementById('refresh-zlecenia-btn'); // zlecenia
+
+    if (refreshZleceniaBtn) {
+        refreshZleceniaBtn.addEventListener('click', odswiez);
     }
 });
 
 // Proste odświeżenie widoku (backend zwróci aktualne dane "na dziś")
 function odswiez() {
-    console.log('🔄 Odświeżanie widoku (reload)');
-    location.reload();
+    console.log('🔄 Odświeżanie widoku (GET bez ponawiania POST)');
+    window.location.replace(window.location.pathname); // czysty GET na /
 }
 
 // FUNKCJA ROZWIJANIA POJAZDÓW (w terminarzu)

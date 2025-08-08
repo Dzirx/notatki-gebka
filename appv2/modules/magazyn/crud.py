@@ -205,7 +205,8 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
             ko.lokalizacjeOpon as lokalizacja,
             kpo.wymianaOpis as opisOponyKPO,
             ko.uwagi as kartaprzechowywalniuwagi,
-            nds.tresc as notatka
+            nds.tresc as notatka,
+            ko.numer as numer_z_karty
         FROM zlecenia z 
         INNER JOIN Kontrahenci k ON z.idKontrahenci = k.id
         INNER JOIN Pojazdy p ON p.id = z.idPojazdy 
@@ -303,6 +304,7 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
                 "lokalizacja": row.lokalizacja,
                 "opisOponyKPO": row.opisOponyKPO,
                 "kartaprzechowywalniuwagi": row.kartaprzechowywalniuwagi,
+                "numer_z_karty": row.numer_z_karty,
                 "notatka": row.notatka,
                 "towary_szczegoly": towary_info['towary_szczegoly'],
                 "uslugi_szczegoly": towary_info['uslugi_szczegoly']
@@ -315,7 +317,9 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
         return []
 
 def get_pojazdy_zlecenia_grouped(db: Session, selected_date: str) -> List[Dict[str, Any]]:
-    """Grupuje zlecenia - jeden wiersz na pojazd z oponami do rozwinięcia"""
+    """
+    Grupuje zlecenia - jeden wiersz na pojazd z oponami pogrupowanymi według depozytów
+    """
     
     zlecenia_data = get_zlecenia_na_dzien(db, selected_date)
     
@@ -325,38 +329,63 @@ def get_pojazdy_zlecenia_grouped(db: Session, selected_date: str) -> List[Dict[s
     for opona in zlecenia_data:
         rej = opona['rej']
         
+        # Inicjalizuj pojazd jeśli nie istnieje
         if rej not in grouped_vehicles:
             grouped_vehicles[rej] = {
                 'rej': rej,
-                'opony': [],
                 'notatka': opona['notatka'],
                 'towary_szczegoly': opona['towary_szczegoly'],
                 'uslugi_szczegoly': opona['uslugi_szczegoly'],
+                'depozyty': {},  # Grupuj według numer_z_karty
                 'lokalizacje_set': set()
             }
         
         vehicle = grouped_vehicles[rej]
         
-        # Dodaj oponę
-        vehicle['opony'].append(opona)
-        
         # Zbieraj unikalne lokalizacje
         if opona['lokalizacja']:
             vehicle['lokalizacje_set'].add(opona['lokalizacja'])
+        
+        # Grupuj opony według numeru depozytu
+        # UWAGA: Musisz dodać numer_z_karty do zapytania query_opony!
+        numer_depozytu = opona.get('numer_z_karty', 'Nieznany')
+        
+        if numer_depozytu not in vehicle['depozyty']:
+            vehicle['depozyty'][numer_depozytu] = {
+                'numer_depozytu': numer_depozytu,
+                'opony': []
+            }
+        
+        # Dodaj oponę do odpowiedniego depozytu
+        vehicle['depozyty'][numer_depozytu]['opony'].append(opona)
     
     # Konwertuj na listę wyników
     result = []
     for rej, vehicle in grouped_vehicles.items():
         lokalizacje_summary = " / ".join(sorted(vehicle['lokalizacje_set']))
         
+        # Policz łączną liczbę opon
+        total_opony = sum(len(depot['opony']) for depot in vehicle['depozyty'].values())
+        
+        # Konwertuj depozyty na listę posortowaną
+        depozyty_list = [
+            {
+                'numer_depozytu': depot_num,
+                'opony_count': len(depot_data['opony']),
+                'opony': depot_data['opony']
+            }
+            for depot_num, depot_data in vehicle['depozyty'].items()
+        ]
+        
         result.append({
             'rej': rej,
-            'opony_count': len(vehicle['opony']),
+            'opony_count': total_opony,
+            'depozyty_count': len(vehicle['depozyty']),
             'lokalizacje_summary': lokalizacje_summary or "Brak lokalizacji",
             'notatka': vehicle['notatka'],
             'towary_szczegoly': vehicle['towary_szczegoly'],
             'uslugi_szczegoly': vehicle['uslugi_szczegoly'],
-            'opony': vehicle['opony']
+            'depozyty': sorted(depozyty_list, key=lambda x: x['numer_depozytu'])
         })
     
     return sorted(result, key=lambda x: x['rej'])

@@ -75,48 +75,54 @@
                                         <div class="pojazd-details-content">
                                             <h4>🔍 Szczegóły opon do wydania</h4>
                                             
-                                            <table class="opony-table-details">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Nazwa opony</th>
-                                                        <th>Felgi/Opony</th>
-                                                        <th>Rodzaj</th>
-                                                        <th>Bieżnik</th>
-                                                        <th>Lokalizacja</th>
-                                                        <th>Opis wymiany</th>
-                                                        <th>Uwagi</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {% for opona in pojazd.opony %}
-                                                    <tr>
-                                                        <td><strong>{{ opona.name or "-" }}</strong></td>
-                                                        <td>{{ opona.wheels or "-" }}</td>
-                                                        <td>
-                                                            {% if opona.rodzaj_opony %}
-                                                                <span class="opona-type opona-{{ opona.rodzaj_opony }}">{{ opona.rodzaj_opony }}</span>
-                                                            {% else %}
-                                                                -
-                                                            {% endif %}
-                                                        </td>
-                                                        <td>{{ opona.bieznik }}mm</td>
-                                                        <td><code>{{ opona.lokalizacja or "-" }}</code></td>
-                                                        <td>{{ opona.opisOponyKPO or "-" }}</td>
-                                                        <td>{{ opona.kartaprzechowywalniuwagi or "-" }}</td>
-                                                    </tr>
-                                                    {% endfor %}
-                                                </tbody>
-                                            </table>
+                                            {% for depozyt in pojazd.depozyty %}
+                                            <div class="depozyt-section" style="margin-bottom: 30px; border: 1px solid #ddd; padding: 15px; border-radius: 8px;">
+                                                <h5>📦 Depozyt: {{ depozyt.numer_depozytu }} ({{ depozyt.opony_count }} opon)</h5>
+                                                
+                                                <table class="opony-table-details">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Nazwa opony</th>
+                                                            <th>Felgi/Opony</th>
+                                                            <th>Rodzaj</th>
+                                                            <th>Bieżnik</th>
+                                                            <th>Lokalizacja</th>
+                                                            <th>Opis wymiany</th>
+                                                            <th>Uwagi</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for opona in depozyt.opony %}
+                                                        <tr>
+                                                            <td><strong>{{ opona.name or "-" }}</strong></td>
+                                                            <td>{{ opona.wheels or "-" }}</td>
+                                                            <td>
+                                                                {% if opona.rodzaj_opony %}
+                                                                    <span class="opona-type opona-{{ opona.rodzaj_opony }}">{{ opona.rodzaj_opony }}</span>
+                                                                {% else %}
+                                                                    -
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>{{ opona.bieznik }}mm</td>
+                                                            <td><code>{{ opona.lokalizacja or "-" }}</code></td>
+                                                            <td>{{ opona.opisOponyKPO or "-" }}</td>
+                                                            <td>{{ opona.kartaprzechowywalniuwagi or "-" }}</td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            {% endfor %}
 
                                             {% if pojazd.towary_szczegoly %}
-                                            <div class="depozyt-info">
+                                            <div class="depozyt-info" style="margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
                                                 <p><strong>📦 Towary do wydania:</strong></p>
                                                 <p>{{ pojazd.towary_szczegoly }}</p>
                                             </div>
                                             {% endif %}
 
                                             {% if pojazd.uslugi_szczegoly %}
-                                            <div class="depozyt-info">
+                                            <div class="depozyt-info" style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
                                                 <p><strong>🔧 Usługi:</strong></p>
                                                 <p>{{ pojazd.uslugi_szczegoly }}</p>
                                             </div>

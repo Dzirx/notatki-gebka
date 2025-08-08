@@ -191,12 +191,13 @@ def get_dostepne_daty_opon(db: Session, limit: int = 30) -> List[str]:
 def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
     """
     Zlecenia rozpoczęte na wskazany dzień (YYYY-MM-DD).
-    To samo co 'get_dzisiejsze_rozpoczete_zlecenia', ale z parametrem daty.
+    Łączy dane opon z towarami/usługami z oddzielnych zapytań.
     """
-    query = text("""
+    
+    # ZAPYTANIE 1: Opony (bez towarów/usług)
+    query_opony = text("""
         SELECT 
             p.nrRejestracyjny as rej,
-            z.dataGodzinaZgloszenia as data_zgloszenia,
             kpo.nazwa AS name,
             ko.felgiOpon AS wheels,
             ko.rodzajDepozytu AS rodzaj_opony,
@@ -204,50 +205,97 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
             ko.lokalizacjeOpon as lokalizacja,
             kpo.wymianaOpis as opisOponyKPO,
             ko.uwagi as kartaprzechowywalniuwagi,
-            ko.numer as numer,
-            z.idDokSprzedazy as dok,
-            nds.tresc as notatka,
-            t.nrKatalogowyBK as numer_katalogowy,
-            STUFF((SELECT DISTINCT ', ' + t2.nazwa + ' ' + CAST(tds2.ilosc as varchar) + ' szt'
-                   FROM TowaryDokSprzedazy tds2 
-                   INNER JOIN Towary t2 ON tds2.idTowary = t2.id
-                   INNER JOIN DokSprzedazy ds2 ON tds2.idDokSprzedazy = ds2.id
-                   INNER JOIN KosztorysyDokSprzedazy kds2 ON ds2.id = kds2.idDokSprzedazy
-                   INNER JOIN Kosztorysy kosz2 ON kosz2.id = kds2.idKosztorysy
-                   WHERE kosz2.idPojazdy = p.id
-                   FOR XML PATH('')), 1, 2, '') as towary_szczegoly,
-            STUFF((SELECT DISTINCT ', ' + u2.nazwa
-                   FROM UslugiDokSprzedazy uds2 
-                   INNER JOIN Uslugi u2 ON uds2.idUslugi = u2.id
-                   INNER JOIN DokSprzedazy ds3 ON uds2.idDokSprzedazy = ds3.id
-                   INNER JOIN KosztorysyDokSprzedazy kds3 ON ds3.id = kds3.idDokSprzedazy
-                   INNER JOIN Kosztorysy kosz3 ON kosz3.id = kds3.idKosztorysy
-                   WHERE kosz3.idPojazdy = p.id
-                   FOR XML PATH('')), 1, 2, '') as uslugi_szczegoly
+            nds.tresc as notatka
         FROM zlecenia z 
         INNER JOIN Kontrahenci k ON z.idKontrahenci = k.id
         INNER JOIN Pojazdy p ON p.id = z.idPojazdy 
         LEFT JOIN DokSprzedazy ds ON ds.id = z.idDokSprzedazy
         LEFT JOIN NotatkiDokSprzedazy nds ON nds.idDokSprzedazy = ds.id
-        LEFT JOIN TowaryDokSprzedazy tds on ds.id = tds.idDokSprzedazy
-        LEFT JOIN Towary t on t.id = tds.idTowary
         LEFT JOIN KartyPrzechowalniOpon ko ON ko.idPojazdy = p.id
         LEFT JOIN OponyKPO kpo ON kpo.idKartyPrzechowalniOpon = ko.id
         LEFT JOIN Felgi f ON kpo.idFelgi = f.id
         LEFT JOIN StanyOpon so ON kpo.idStanyOpon = so.id
         LEFT JOIN ProducenciOpon po ON kpo.idProducenciOpon = po.id
-        WHERE ko.numer IS NOT NULL
-          AND CAST(z.dataGodzinaZgloszenia AS DATE) = :selected_date
-          AND z.idStatusyZlecen = 2
+        WHERE
+            ko.numer IS NOT NULL
+            AND nds.tresc IS NOT NULL
+            AND CHARINDEX('/', ko.numer) > 0
+            AND CHARINDEX('/', CAST(nds.tresc AS varchar(500))) > 0
+            AND EXISTS (
+                SELECT 1 
+                FROM 
+                    (SELECT number FROM master.dbo.spt_values WHERE type = 'P' AND number <= 50) n
+                WHERE 
+                    n.number <= LEN(CAST(nds.tresc AS varchar(500)))
+                    AND (n.number = 1 OR SUBSTRING(CAST(nds.tresc AS varchar(500)), n.number - 1, 1) = '/')
+                    AND (
+                        SUBSTRING(CAST(nds.tresc AS varchar(500)), n.number, 1) BETWEEN '0' AND '9'
+                    )
+                    AND LEFT(ko.numer, CHARINDEX('/', ko.numer) - 1) = 
+                        SUBSTRING(
+                            CAST(nds.tresc AS varchar(500)), 
+                            n.number, 
+                            CASE 
+                                WHEN CHARINDEX('/', CAST(nds.tresc AS varchar(500)) + '/ ', n.number) > n.number 
+                                    AND CHARINDEX(' ', CAST(nds.tresc AS varchar(500)) + '/ ', n.number) > n.number
+                                THEN 
+                                    CASE 
+                                        WHEN CHARINDEX('/', CAST(nds.tresc AS varchar(500)) + '/ ', n.number) < CHARINDEX(' ', CAST(nds.tresc AS varchar(500)) + '/ ', n.number)
+                                        THEN CHARINDEX('/', CAST(nds.tresc AS varchar(500)) + '/ ', n.number) - n.number
+                                        ELSE CHARINDEX(' ', CAST(nds.tresc AS varchar(500)) + '/ ', n.number) - n.number
+                                    END
+                                WHEN CHARINDEX('/', CAST(nds.tresc AS varchar(500)) + '/ ', n.number) > n.number
+                                THEN CHARINDEX('/', CAST(nds.tresc AS varchar(500)) + '/ ', n.number) - n.number
+                                ELSE CHARINDEX(' ', CAST(nds.tresc AS varchar(500)) + '/ ', n.number) - n.number
+                            END
+                        )
+            )
+            AND CAST(z.dataGodzinaZgloszenia AS DATE) = :selected_date
+            AND z.idStatusyZlecen = 2
         ORDER BY z.dataGodzinaZgloszenia DESC, p.nrRejestracyjny ASC
     """)
+    
+    # ZAPYTANIE 2: Towary/Usługi per pojazd
+    query_towary_uslugi = text("""
+        SELECT 
+            p.nrRejestracyjny as rej,
+            STRING_AGG(t.nazwa + ' (' + ISNULL(t.nrKatalogowyBK, '') + ') ' + CAST(tds.ilosc as varchar) + ' szt', ', ') as towary_szczegoly,
+            STRING_AGG(u.nazwa, ', ') as uslugi_szczegoly
+        FROM zlecenia z
+        INNER JOIN Pojazdy p ON p.id = z.idPojazdy
+        LEFT JOIN DokSprzedazy ds ON ds.id = z.idDokSprzedazy
+        LEFT JOIN TowaryDokSprzedazy tds ON tds.idDokSprzedazy = ds.id
+        LEFT JOIN Towary t ON t.id = tds.idTowary
+        LEFT JOIN UslugiDokSprzedazy uds ON uds.idDokSprzedazy = ds.id
+        LEFT JOIN Uslugi u ON u.id = uds.idUslugi
+        WHERE CAST(z.dataGodzinaZgloszenia AS DATE) = :selected_date
+          AND z.idStatusyZlecen = 2
+        GROUP BY p.nrRejestracyjny
+    """)
+    
     try:
-        rows = db.execute(query, {"selected_date": selected_date}).fetchall()
+        # Wykonaj oba zapytania
+        opony_rows = db.execute(query_opony, {"selected_date": selected_date}).fetchall()
+        towary_rows = db.execute(query_towary_uslugi, {"selected_date": selected_date}).fetchall()
+        
+        print(f"🔍 Opony: {len(opony_rows)} rekordów, Towary/Usługi: {len(towary_rows)} pojazdów")
+        
+        # Twórz słownik towarów/usług po nr rejestracyjnym
+        towary_dict = {}
+        for row in towary_rows:
+            towary_dict[row.rej] = {
+                'towary_szczegoly': row.towary_szczegoly,
+                'uslugi_szczegoly': row.uslugi_szczegoly
+            }
+        
+        # Łącz dane opon z towarami/usługami
         data = []
-        for row in rows:
+        for row in opony_rows:
+            rej = row.rej
+            towary_info = towary_dict.get(rej, {'towary_szczegoly': None, 'uslugi_szczegoly': None})
+            
             data.append({
-                "rej": row.rej,
-                "data_zgloszenia": row.data_zgloszenia,
+                "rej": rej,
                 "name": row.name,
                 "wheels": row.wheels,
                 "rodzaj_opony": row.rodzaj_opony,
@@ -255,14 +303,60 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
                 "lokalizacja": row.lokalizacja,
                 "opisOponyKPO": row.opisOponyKPO,
                 "kartaprzechowywalniuwagi": row.kartaprzechowywalniuwagi,
-                "numer": row.numer,
-                "dok": row.dok,
                 "notatka": row.notatka,
-                "numer_katalogowy": row.numer_katalogowy,
-                "towary_szczegoly": row.towary_szczegoly,
-                "uslugi_szczegoly": row.uslugi_szczegoly,
+                "towary_szczegoly": towary_info['towary_szczegoly'],
+                "uslugi_szczegoly": towary_info['uslugi_szczegoly']
             })
+        
         return data
+        
     except Exception as e:
         print(f"❌ Błąd get_zlecenia_na_dzien: {e}")
         return []
+
+def get_pojazdy_zlecenia_grouped(db: Session, selected_date: str) -> List[Dict[str, Any]]:
+    """Grupuje zlecenia - jeden wiersz na pojazd z oponami do rozwinięcia"""
+    
+    zlecenia_data = get_zlecenia_na_dzien(db, selected_date)
+    
+    # Grupuj według nr rejestracyjnego
+    grouped_vehicles = {}
+    
+    for opona in zlecenia_data:
+        rej = opona['rej']
+        
+        if rej not in grouped_vehicles:
+            grouped_vehicles[rej] = {
+                'rej': rej,
+                'opony': [],
+                'notatka': opona['notatka'],
+                'towary_szczegoly': opona['towary_szczegoly'],
+                'uslugi_szczegoly': opona['uslugi_szczegoly'],
+                'lokalizacje_set': set()
+            }
+        
+        vehicle = grouped_vehicles[rej]
+        
+        # Dodaj oponę
+        vehicle['opony'].append(opona)
+        
+        # Zbieraj unikalne lokalizacje
+        if opona['lokalizacja']:
+            vehicle['lokalizacje_set'].add(opona['lokalizacja'])
+    
+    # Konwertuj na listę wyników
+    result = []
+    for rej, vehicle in grouped_vehicles.items():
+        lokalizacje_summary = " / ".join(sorted(vehicle['lokalizacje_set']))
+        
+        result.append({
+            'rej': rej,
+            'opony_count': len(vehicle['opony']),
+            'lokalizacje_summary': lokalizacje_summary or "Brak lokalizacji",
+            'notatka': vehicle['notatka'],
+            'towary_szczegoly': vehicle['towary_szczegoly'],
+            'uslugi_szczegoly': vehicle['uslugi_szczegoly'],
+            'opony': vehicle['opony']
+        })
+    
+    return sorted(result, key=lambda x: x['rej'])

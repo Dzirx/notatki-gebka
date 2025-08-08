@@ -35,26 +35,20 @@ async def magazyn_home(request: Request, db: Session = Depends(get_samochody_db)
     dzisiejsza_data = today_str()
     error_message: Optional[str] = None
 
-    # Pobierz dzisiejsze zlecenia (jeśli get_zlecenia_na_dzien nie istnieje, można użyć get_dzisiejsze_rozpoczete_zlecenia)
+    # Pobierz dzisiejsze zlecenia - użyj funkcji grupującej
     try:
-        if hasattr(crud, "get_zlecenia_na_dzien"):
-            zlecenia_data = crud.get_zlecenia_na_dzien(db, dzisiejsza_data)
-        else:
-            zlecenia_data = crud.get_dzisiejsze_rozpoczete_zlecenia(db)
+        pojazdy_zlecenia_grouped = crud.get_pojazdy_zlecenia_grouped(db, dzisiejsza_data)
     except Exception as e:
-        zlecenia_data = []
+        pojazdy_zlecenia_grouped = []
         error_message = f"Błąd podczas pobierania dzisiejszych zleceń: {e}"
-
-    podsumowania = _build_podsumowania(zlecenia_data)
 
     return templates.TemplateResponse("index.html", {
         "request": request,
         "dzisiejsza_data": dzisiejsza_data,
         "active_tab": "zlecenia",
         "selected_date": None,
-        "pojazdy_grouped": [],
-        "zlecenia_data": zlecenia_data,
-        "podsumowania_per_pojazd": podsumowania,
+        "pojazdy_grouped": [],  # dla terminarza
+        "pojazdy_zlecenia_grouped": pojazdy_zlecenia_grouped,  # dla zleceń
         "error_message": error_message,
     })
 
@@ -69,7 +63,7 @@ async def magazyn_search(
     """
     Obsługa formularzy:
     - tab == 'terminarz'  -> render harmonogramu na wybraną datę
-    - tab == 'zlecenia'   -> zlecenia na wybraną datę (jeśli brak funkcji, fallback do dzisiaj)
+    - tab == 'zlecenia'   -> zlecenia na wybraną datę
     """
     dzisiejsza_data = today_str()
     error_message: Optional[str] = None
@@ -87,32 +81,24 @@ async def magazyn_search(
             "active_tab": "terminarz",
             "selected_date": selected_date,
             "pojazdy_grouped": pojazdy_grouped,
-            "zlecenia_data": [],
-            "podsumowania_per_pojazd": [],
+            "pojazdy_zlecenia_grouped": [],  # puste dla terminarza
             "error_message": error_message,
         })
 
     if tab == "zlecenia":
         try:
-            if hasattr(crud, "get_zlecenia_na_dzien"):
-                zlecenia_data = crud.get_zlecenia_na_dzien(db, selected_date)
-            else:
-                # Fallback: jeśli nie masz jeszcze funkcji na dowolną datę, pokaż dzisiejsze
-                zlecenia_data = crud.get_dzisiejsze_rozpoczete_zlecenia(db)
+            pojazdy_zlecenia_grouped = crud.get_pojazdy_zlecenia_grouped(db, selected_date)
         except Exception as e:
-            zlecenia_data = []
+            pojazdy_zlecenia_grouped = []
             error_message = f"Błąd podczas pobierania zleceń: {e}"
-
-        podsumowania = _build_podsumowania(zlecenia_data)
 
         return templates.TemplateResponse("index.html", {
             "request": request,
             "dzisiejsza_data": dzisiejsza_data,
             "active_tab": "zlecenia",
             "selected_date": selected_date,
-            "pojazdy_grouped": [],
-            "zlecenia_data": zlecenia_data,
-            "podsumowania_per_pojazd": podsumowania,
+            "pojazdy_grouped": [],  # puste dla zleceń
+            "pojazdy_zlecenia_grouped": pojazdy_zlecenia_grouped,
             "error_message": error_message,
         })
 
@@ -129,42 +115,6 @@ async def magazyn_search(
         "active_tab": "terminarz",
         "selected_date": selected_date,
         "pojazdy_grouped": pojazdy_grouped,
-        "zlecenia_data": [],
-        "podsumowania_per_pojazd": [],
+        "pojazdy_zlecenia_grouped": [],
         "error_message": error_message,
     })
-
-
-# === Helpers ===
-
-def _get_attr(obj: Any, name: str) -> Any:
-    """Bezpieczne pobieranie atrybutu (ORM) lub klucza (dict)."""
-    if isinstance(obj, dict):
-        return obj.get(name)
-    return getattr(obj, name, None)
-
-
-def _build_podsumowania(zlecenia: Iterable[Any]) -> List[Dict[str, Optional[str]]]:
-    """
-    Agreguje TOWARY + NOTATKI per pojazd (rej).
-    Korzysta z pól: rej, towary_szczegoly, notatka.
-    """
-    by = defaultdict(lambda: {"towary": set(), "notatki": set()})
-    for z in (zlecenia or []):
-        rej = _get_attr(z, "rej") or "—"
-        tow = _get_attr(z, "towary_szczegoly")
-        notka = _get_attr(z, "notatka")
-        if tow:
-            by[rej]["towary"].add(str(tow))
-        if notka:
-            by[rej]["notatki"].add(str(notka))
-
-    out: List[Dict[str, Optional[str]]] = []
-    for rej, vals in by.items():
-        out.append({
-            "rej": rej,
-            "towary": " | ".join(sorted(vals["towary"])) if vals["towary"] else None,
-            "notatki": " | ".join(sorted(vals["notatki"])) if vals["notatki"] else None,
-        })
-    out.sort(key=lambda x: x["rej"])
-    return out

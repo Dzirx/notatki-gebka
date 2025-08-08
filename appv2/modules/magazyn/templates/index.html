@@ -39,69 +39,99 @@
 
             <!-- ZAKŁADKA: ZLECENIA -->
             <div id="zlecenia" class="tab-content {% if active_tab != 'terminarz' %}active{% endif %}">
-                <h3>🚗 Zlecenia na dziś</h3>
+                <h3>🚗 Zlecenia - Opony do wydania</h3>
 
-                <!-- Pasek akcji -->
+                <!-- Pasek informacyjny -->
                 <div class="search-form-container" style="display:flex;align-items:center;gap:12px;margin-bottom:20px; background: none; box-shadow: none;">
                     <div><strong>Data:</strong> <span id="dzis-data">{{ dzisiejsza_data }}</span></div>
-                    <button type="button" id="refresh-btn" class="btn-primary">🔄 Odśwież</button>
+                    <button type="button" id="refresh-zlecenia-btn" class="btn-primary">🔄 Odśwież</button>
                 </div>
 
                 <!-- WYNIKI ZLECEŃ -->
                 <div class="results-container" style="box-shadow: none; background: none; padding: 0;">
-                    {% if zlecenia_data %}
+                    
+                    {% if pojazdy_zlecenia_grouped %}
                     <div class="table-responsive">
-                        <table class="opony-table" id="zlecenia-table">
+                        <table class="opony-table">
                             <thead>
                                 <tr>
-                                    <th>Nr rej.</th>
-                                    <th>Data zgłoszenia</th>
-                                    <th>Opona</th>
-                                    <th>Rodzaj/Bieżnik</th>
-                                    <th>Lokalizacja</th>
-                                    <th>Nr karty</th>
-                                    <th>Nr katalogowy</th>
+                                    <th>Nr Rejestracyjny</th>
+                                    <th>Opony do wydania</th>
+                                    <th>Lokalizacje</th>
+                                    <th>Notatka</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for z in zlecenia_data %}
-                                <tr>
-                                    <td><strong>{{ z.rej or '-' }}</strong></td>
-                                    <td>{{ z.data_zgloszenia.strftime('%d.%m.%Y %H:%M') if z.data_zgloszenia else '-' }}</td>
-                                    <td><strong>{{ z.name or '-' }}</strong></td>
-                                    <td>
-                                        {% if z.rodzaj_opony %}
-                                            <span class="opona-type opona-{{ z.rodzaj_opony }}">{{ z.rodzaj_opony }}</span>
-                                            <br><small>{{ z.bieznik }}mm</small>
-                                        {% else %}
-                                            -
-                                        {% endif %}
+                                {% for pojazd in pojazdy_zlecenia_grouped %}
+                                <tr class="vehicle-header" onclick="togglePojazd('zlecenie_{{ pojazd.rej }}')" style="cursor: pointer;">
+                                    <td><strong>{{ pojazd.rej }}</strong></td>
+                                    <td>{{ pojazd.opony_count }} opon</td>
+                                    <td>{{ pojazd.lokalizacje_summary }}</td>
+                                    <td>{{ pojazd.notatka or "-" }}</td>
+                                </tr>
+                                
+                                <tr class="pojazd-details" data-rej="zlecenie_{{ pojazd.rej }}" style="display: none;">
+                                    <td colspan="4">
+                                        <div class="pojazd-details-content">
+                                            <h4>🔍 Szczegóły opon do wydania</h4>
+                                            
+                                            <table class="opony-table-details">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Nazwa opony</th>
+                                                        <th>Felgi/Opony</th>
+                                                        <th>Rodzaj</th>
+                                                        <th>Bieżnik</th>
+                                                        <th>Lokalizacja</th>
+                                                        <th>Opis wymiany</th>
+                                                        <th>Uwagi</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for opona in pojazd.opony %}
+                                                    <tr>
+                                                        <td><strong>{{ opona.name or "-" }}</strong></td>
+                                                        <td>{{ opona.wheels or "-" }}</td>
+                                                        <td>
+                                                            {% if opona.rodzaj_opony %}
+                                                                <span class="opona-type opona-{{ opona.rodzaj_opony }}">{{ opona.rodzaj_opony }}</span>
+                                                            {% else %}
+                                                                -
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>{{ opona.bieznik }}mm</td>
+                                                        <td><code>{{ opona.lokalizacja or "-" }}</code></td>
+                                                        <td>{{ opona.opisOponyKPO or "-" }}</td>
+                                                        <td>{{ opona.kartaprzechowywalniuwagi or "-" }}</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+
+                                            {% if pojazd.towary_szczegoly %}
+                                            <div class="depozyt-info">
+                                                <p><strong>📦 Towary do wydania:</strong></p>
+                                                <p>{{ pojazd.towary_szczegoly }}</p>
+                                            </div>
+                                            {% endif %}
+
+                                            {% if pojazd.uslugi_szczegoly %}
+                                            <div class="depozyt-info">
+                                                <p><strong>🔧 Usługi:</strong></p>
+                                                <p>{{ pojazd.uslugi_szczegoly }}</p>
+                                            </div>
+                                            {% endif %}
+                                        </div>
                                     </td>
-                                    <td><code>{{ z.lokalizacja or '-' }}</code></td>
-                                    <td><span class="numer-karty">{{ z.numer or '-' }}</span></td>
-                                    <td><small>{{ z.numer_katalogowy or '-' }}</small></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
-
-                    <!-- PODSUMOWANIA PER POJAZD -->
-                    {% if podsumowania_per_pojazd %}
-                    <div id="car-summary" style="margin-top:16px">
-                        {% for pojazd in podsumowania_per_pojazd %}
-                        <div class="results-container">
-                            <h4>🚗 {{ pojazd.rej }}</h4>
-                            <p><strong>📦 Towary:</strong> {{ pojazd.towary or "Brak" }}</p>
-                            <p><strong>📝 Notatki:</strong> {{ pojazd.notatki or "Brak" }}</p>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
+                    
                     {% else %}
                     <div class="no-results">
-                        <p>❌ Brak dzisiejszych zleceń</p>
+                        <p>❌ Brak zleceń na dziś: <strong>{{ dzisiejsza_data }}</strong></p>
                         <p>Spróbuj odświeżyć lub sprawdź później.</p>
                     </div>
                     {% endif %}
@@ -151,7 +181,7 @@
                                 </tr>
                                 
                                 <tr class="pojazd-details" data-rej="{{ pojazd.rej }}" style="display: none;">
-                                    <td colspan="5">
+                                    <td colspan="4">
                                         {% for depozyt in pojazd.depozyty %}
                                         <h4>📦 Depozyt: {{ depozyt.numer_depozytu }}</h4>
                                         
@@ -186,14 +216,14 @@
 
                                         {% if depozyt.towary_szczegoly %}
                                         <div class="depozyt-info">
-                                            <p><strong>📦 Towary </strong></p>
+                                            <p><strong>📦 Towary:</strong></p>
                                             <p>{{ depozyt.towary_szczegoly }}</p>
                                         </div>
                                         {% endif %}
 
                                         {% if depozyt.uslugi_szczegoly %}
                                         <div class="depozyt-info">
-                                            <p><strong>🔧 Usługi </strong></p>
+                                            <p><strong>🔧 Usługi:</strong></p>
                                             <p>{{ depozyt.uslugi_szczegoly }}</p>
                                         </div>
                                         {% endif %}
@@ -219,5 +249,13 @@
 
     <script src="/static/js/common.js"></script>
     <script src="/modules/magazyn/static/js/magazyn.js"></script>
+    <script>
+        function togglePojazd(rejId) {
+            const details = document.querySelector(`[data-rej="${rejId}"]`);
+            if (details) {
+                details.style.display = details.style.display === 'none' ? 'table-row' : 'none';
+            }
+        }
+    </script>
 </body>
 </html>

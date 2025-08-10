@@ -14,31 +14,20 @@ def convert_decimal_to_float(value):
 def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
     """Pobiera informacje o oponach na wybrany dzień z bazy samochody_db"""
     
-    query = text("""
-        SELECT p.nrRejestracyjny AS rej,
-               kpo.nazwa AS name,
-               ko.felgiOpon AS wheels,
-               ko.rodzajDepozytu AS rodzaj_opony,
-               kpo.glebokoscBieznika AS bieznik,
-               ko.lokalizacjeOpon AS lokalizacja,
-               zp.data AS data,
-               kpo.wymianaOpis as opona_uwagi,
-               ko.uwagi as karta_przechowywalni_uwagi,
-               ko.numer AS numer_depozytu,
-               CASE WHEN ROW_NUMBER() OVER (PARTITION BY zp.id ORDER BY kpo.id) = 1 THEN STUFF((
-                   SELECT DISTINCT ', ' + t2.nazwa
-                   FROM TowaryKosztorysow tk2
-                   INNER JOIN Towary t2 ON tk2.idTowary = t2.id
-                   WHERE tk2.idKosztorysy = k.id
-                   FOR XML PATH('')
-               ), 1, 2, '') ELSE NULL END AS towary_szczegoly,
-               CASE WHEN ROW_NUMBER() OVER (PARTITION BY zp.id ORDER BY kpo.id) = 1 THEN STUFF((
-                   SELECT DISTINCT ', ' + u2.nazwa
-                   FROM UslugiKosztorysow uk2
-                   INNER JOIN Uslugi u2 ON uk2.idUslugi = u2.id
-                   WHERE uk2.idKosztorysy = k.id
-                   FOR XML PATH('')
-               ), 1, 2, '') ELSE NULL END AS uslugi_szczegoly
+    query_opony = text("""
+        SELECT 
+            p.nrRejestracyjny AS rej,
+            kpo.nazwa AS name,
+            ko.felgiOpon AS wheels,
+            ko.rodzajDepozytu AS rodzaj_opony,
+            kpo.glebokoscBieznika AS bieznik,
+            ko.lokalizacjeOpon AS lokalizacja,
+            zp.data AS data,
+            kpo.wymianaOpis as opona_uwagi,
+            ko.uwagi as karta_przechowywalni_uwagi,
+            ko.numer AS numer_depozytu,
+            zp.opis as opis_terminarza
+               
         FROM ZapisyTerminarzy zp
         LEFT JOIN Pojazdy p ON p.id = zp.idPojazdy
         LEFT JOIN KartyPrzechowalniOpon ko ON ko.idPojazdy = p.id
@@ -47,36 +36,98 @@ def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
         LEFT JOIN StanyOpon so ON kpo.idStanyOpon = so.id
         LEFT JOIN ProducenciOpon po ON kpo.idProducenciOpon = po.id
         LEFT JOIN Kosztorysy k ON k.id = zp.idKosztorysy
-        WHERE (
-            (CAST(zp.opis AS VARCHAR(100)) NOT LIKE '% %' AND CAST(zp.opis AS VARCHAR(100)) NOT LIKE '%/%'
-             AND CAST(zp.opis AS VARCHAR(100)) = LEFT(ko.numer, CHARINDEX('/', ko.numer + '/') - 1))
-            OR
-            (CAST(zp.opis AS VARCHAR(100)) LIKE '% %' AND CAST(zp.opis AS VARCHAR(100)) NOT LIKE '%/%'
-             AND LEFT(CAST(zp.opis AS VARCHAR(100)), CHARINDEX(' ', CAST(zp.opis AS VARCHAR(100)) + ' ') - 1) = LEFT(ko.numer, CHARINDEX('/', ko.numer + '/') - 1))
-            OR
-            (CAST(zp.opis AS VARCHAR(100)) LIKE '%/%'
-             AND (
-                 LEFT(CAST(zp.opis AS VARCHAR(100)), CHARINDEX('/', CAST(zp.opis AS VARCHAR(100)) + '/') - 1) = LEFT(ko.numer, CHARINDEX('/', ko.numer + '/') - 1)
-                 OR
-                 RIGHT(CAST(zp.opis AS VARCHAR(100)), LEN(CAST(zp.opis AS VARCHAR(100))) - CHARINDEX('/', CAST(zp.opis AS VARCHAR(100)))) = LEFT(ko.numer, CHARINDEX('/', ko.numer + '/') - 1)
-             )
+        WHERE
+            ko.numer IS NOT NULL
+            AND zp.opis IS NOT NULL
+            AND CAST(zp.data AS DATE) = :selected_date   -- lub wstaw stałą datę
+
+            /* Dopasuj którykolwiek segment z pierwszego tokena opisu
+            do pierwszego segmentu numeru depozytu (przed '/') */
+            AND EXISTS (
+                /* 1) weź pierwszy token (do pierwszej spacji) z opisu */
+                SELECT 1
+                FROM (
+                    SELECT LTRIM(RTRIM(
+                            CASE
+                            WHEN CHARINDEX(' ', CAST(zp.opis AS varchar(500))) > 0
+                                THEN LEFT(CAST(zp.opis AS varchar(500)),
+                                        CHARINDEX(' ', CAST(zp.opis AS varchar(500))) - 1)
+                            ELSE CAST(zp.opis AS varchar(500))
+                            END
+                        )) AS token
+                ) t
+                /* 2) rozbij token po '/' na segmenty */
+                CROSS APPLY (
+                    SELECT LTRIM(RTRIM(
+                            SUBSTRING(
+                                t.token + '/',
+                                n.number,
+                                CHARINDEX('/', t.token + '/', n.number) - n.number
+                            )
+                        )) AS seg
+                    FROM (SELECT number 
+                        FROM master.dbo.spt_values 
+                        WHERE type = 'P' AND number BETWEEN 1 AND 200) n
+                    WHERE n.number <= LEN(t.token)
+                    AND (n.number = 1 OR SUBSTRING(t.token, n.number - 1, 1) = '/')
+                    AND CHARINDEX('/', t.token + '/', n.number) > n.number
+                ) parts
+                /* 3) porównanie segmentu do pierwszego segmentu ko.numer */
+                WHERE parts.seg <> ''
+                -- jeśli segmenty mają być liczbowe, odkomentuj:
+                -- AND TRY_CONVERT(int, parts.seg) IS NOT NULL
+                AND parts.seg = LEFT(ko.numer, CHARINDEX('/', ko.numer + '/') - 1)
             )
-        )
-        AND CAST(zp.data AS DATE) = :selected_date
-        ORDER BY p.nrRejestracyjny, ko.numer, kpo.id;
     """)
+
+    query_towary = text("""
+        SELECT 
+            UPPER(LTRIM(RTRIM(p.nrRejestracyjny))) AS rej_norm,
+            p.nrRejestracyjny AS rej,
+            STUFF((SELECT DISTINCT ', ' + t.nazwa + ' (nr katalogowy: ' + ISNULL(t.nrKatalogowy, '') + ') ' + CAST(tk.ilosc AS varchar) + ' szt'
+                    FROM TowaryKosztorysow tk 
+                    JOIN Towary t ON t.id = tk.idTowary 
+                    WHERE tk.idKosztorysy = k.id
+                    FOR XML PATH('')), 1, 2, '') AS towary_szczegoly,
+            STUFF((SELECT DISTINCT ', ' + u.nazwa 
+                    FROM UslugiKosztorysow uk 
+                    JOIN Uslugi u ON u.id = uk.idUslugi 
+                    WHERE uk.idKosztorysy = k.id
+                    FOR XML PATH('')), 1, 2, '') AS uslugi_szczegoly
+                        FROM ZapisyTerminarzy zp
+            JOIN Pojazdy p ON p.id = zp.idPojazdy
+            LEFT JOIN Kosztorysy k ON k.id = zp.idKosztorysy
+            WHERE CAST(zp.data AS DATE) = :selected_date
+            GROUP BY p.nrRejestracyjny, k.id;
+                        
+        """)
     
     try:
-        result = db.execute(query, {"selected_date": selected_date})
-        rows = result.fetchall()
+        # Wykonaj oba zapytania
+        opony_result = db.execute(query_opony, {"selected_date": selected_date})
+        opony_rows = opony_result.fetchall()
         
-        print(f"🔍 Zapytanie zwróciło {len(rows)} rekordów dla daty {selected_date}")
+        towary_result = db.execute(query_towary, {"selected_date": selected_date})
+        towary_rows = towary_result.fetchall()
         
-        # Konwersja wyników
+        print(f"🔍 Opony: {len(opony_rows)}, Towary: {len(towary_rows)} rekordów dla daty {selected_date}")
+        
+        # Słownik towarów według nr rejestracyjnego
+        towary_dict = {}
+        for row in towary_rows:
+            towary_dict[row.rej] = {
+                'towary_szczegoly': row.towary_szczegoly,
+                'uslugi_szczegoly': row.uslugi_szczegoly
+            }
+        
+        # Łącz opony z towarami
         opony_data = []
-        for row in rows:
+        for row in opony_rows:
+            rej = row.rej
+            towary_info = towary_dict.get(rej, {'towary_szczegoly': None, 'uslugi_szczegoly': None})
+            
             opony_data.append({
-                "rej": row.rej,
+                "rej": rej,
                 "name": row.name,
                 "wheels": row.wheels,
                 "rodzaj_opony": row.rodzaj_opony,
@@ -86,8 +137,9 @@ def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
                 "opona_uwagi": row.opona_uwagi,
                 "karta_przechowywalni_uwagi": row.karta_przechowywalni_uwagi,
                 "numer_depozytu": row.numer_depozytu,
-                "towary_szczegoly": row.towary_szczegoly,
-                "uslugi_szczegoly": row.uslugi_szczegoly
+                "opis_terminarza": row.opis_terminarza,
+                "towary_szczegoly": towary_info['towary_szczegoly'],
+                "uslugi_szczegoly": towary_info['uslugi_szczegoly']
             })
         
         return opony_data
@@ -95,7 +147,7 @@ def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
     except Exception as e:
         print(f"❌ Błąd podczas pobierania danych opon: {e}")
         return []
-
+    
 def get_pojazdy_grouped_for_terminarz(db: Session, selected_date: str) -> List[Dict[str, Any]]:
     """Grupuje pojazdy - jeden wiersz na pojazd z depozytami do rozwinięcia"""
     
@@ -116,7 +168,8 @@ def get_pojazdy_grouped_for_terminarz(db: Session, selected_date: str) -> List[D
                     'wheels_summary': set(),
                     'lokalizacje_summary': set(),
                     'uwagi_summary': set()
-                }
+                },
+                'opis_terminarza': opona['opis_terminarza'] 
             }
         
         vehicle = grouped_vehicles[rej]
@@ -161,8 +214,10 @@ def get_pojazdy_grouped_for_terminarz(db: Session, selected_date: str) -> List[D
             'uwagi_summary': uwagi_str or "Brak uwag",
             'total_opony': vehicle['total_opony'],
             'depozyty_count': len(vehicle['depozyty']),
-            'depozyty': list(vehicle['depozyty'].values())
+            'depozyty': list(vehicle['depozyty'].values()),
+            'opis_terminarza': vehicle['opis_terminarza']
         })
+        
     
     return result
 
@@ -193,7 +248,6 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
     Zlecenia rozpoczęte na wskazany dzień.
     ZAPYTANIE 1: Opony z notatkami
     ZAPYTANIE 2: Towary/Usługi wszystkich zleceń
-    ZAPYTANIE 3: Zlecenia które mają tylko towary (bez notatek/opon)
     """
     
     # ZAPYTANIE 1: Opony (tylko te z notatkami)
@@ -208,8 +262,7 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
             kpo.wymianaOpis as opisOponyKPO,
             ko.uwagi as kartaprzechowywalniuwagi,
             ko.numer as numer_z_karty,
-            nds.tresc as notatka,
-            'opony' as typ_rekordu
+            nds.tresc as notatka
         FROM zlecenia z 
         INNER JOIN Kontrahenci k ON z.idKontrahenci = k.id
         INNER JOIN Pojazdy p ON p.id = z.idPojazdy 
@@ -221,78 +274,50 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
             ko.numer IS NOT NULL
             AND nds.tresc IS NOT NULL
             AND CHARINDEX('/', ko.numer) > 0
-            AND CHARINDEX('/', CAST(nds.tresc AS varchar(500))) > 0
             AND EXISTS (
-                SELECT 1 
-                FROM 
-                    (SELECT number FROM master.dbo.spt_values WHERE type = 'P' AND number <= 50) n
-                WHERE 
-                    n.number <= LEN(CAST(nds.tresc AS varchar(500)))
-                    AND (n.number = 1 OR SUBSTRING(CAST(nds.tresc AS varchar(500)), n.number - 1, 1) = '/')
-                    AND (
-                        SUBSTRING(CAST(nds.tresc AS varchar(500)), n.number, 1) BETWEEN '0' AND '9'
-                    )
-                    AND LEFT(ko.numer, CHARINDEX('/', ko.numer) - 1) = 
-                        SUBSTRING(
-                            CAST(nds.tresc AS varchar(500)), 
-                            n.number, 
-                            CASE 
-                                WHEN CHARINDEX('/', CAST(nds.tresc AS varchar(500)) + '/ ', n.number) > n.number 
-                                    AND CHARINDEX(' ', CAST(nds.tresc AS varchar(500)) + '/ ', n.number) > n.number
-                                THEN 
-                                    CASE 
-                                        WHEN CHARINDEX('/', CAST(nds.tresc AS varchar(500)) + '/ ', n.number) < CHARINDEX(' ', CAST(nds.tresc AS varchar(500)) + '/ ', n.number)
-                                        THEN CHARINDEX('/', CAST(nds.tresc AS varchar(500)) + '/ ', n.number) - n.number
-                                        ELSE CHARINDEX(' ', CAST(nds.tresc AS varchar(500)) + '/ ', n.number) - n.number
-                                    END
-                                WHEN CHARINDEX('/', CAST(nds.tresc AS varchar(500)) + '/ ', n.number) > n.number
-                                THEN CHARINDEX('/', CAST(nds.tresc AS varchar(500)) + '/ ', n.number) - n.number
-                                ELSE CHARINDEX(' ', CAST(nds.tresc AS varchar(500)) + '/ ', n.number) - n.number
-                            END
+                SELECT 1
+                FROM (
+                    -- Wyciągnij część notatki przed pierwszą spacją
+                    SELECT 
+                        CASE 
+                            WHEN CHARINDEX(' ', LTRIM(CAST(nds.tresc AS varchar(500)))) > 0
+                            THEN LEFT(LTRIM(CAST(nds.tresc AS varchar(500))), CHARINDEX(' ', LTRIM(CAST(nds.tresc AS varchar(500)))) - 1)
+                            ELSE LTRIM(CAST(nds.tresc AS varchar(500)))
+                        END as numery_czesc
+                ) parts
+                CROSS APPLY (
+                    -- Parsuj numery z tej części
+                    SELECT 
+                        LTRIM(RTRIM(
+                            SUBSTRING(
+                                parts.numery_czesc + '/',
+                                n.number,
+                                CHARINDEX('/', parts.numery_czesc + '/', n.number) - n.number
+                            )
+                        )) as pojedynczy_numer
+                    FROM 
+                        (SELECT number FROM master.dbo.spt_values WHERE type = 'P' AND number <= 50) n
+                    WHERE 
+                        n.number <= LEN(parts.numery_czesc)
+                        AND (
+                            n.number = 1 
+                            OR SUBSTRING(parts.numery_czesc, n.number - 1, 1) = '/'
                         )
+                        AND CHARINDEX('/', parts.numery_czesc + '/', n.number) > n.number
+                ) parsed_numbers
+                WHERE 
+                    ISNUMERIC(parsed_numbers.pojedynczy_numer) = 1
+                    AND parsed_numbers.pojedynczy_numer = LEFT(ko.numer, CHARINDEX('/', ko.numer) - 1)
             )
             AND CAST(z.dataGodzinaZgloszenia AS DATE) = :selected_date
             AND z.idStatusyZlecen = 2
     """)
     
     # ZAPYTANIE 2: Zlecenia bez notatek ale z towarami (tylko towary)
-    query_tylko_towary = text("""
+    query_tylko_towary_uslugi = text("""
         SELECT 
             p.nrRejestracyjny as rej,
-            NULL as name,
-            NULL as wheels,
-            NULL as rodzaj_opony,
-            NULL as bieznik,
-            NULL as lokalizacja,
-            NULL as opisOponyKPO,
-            NULL as kartaprzechowywalniuwagi,
-            NULL as numer_z_karty,
-            nds.tresc as notatka,
-            'tylko_towary' as typ_rekordu
-        FROM zlecenia z 
-        INNER JOIN Kontrahenci k ON z.idKontrahenci = k.id
-        INNER JOIN Pojazdy p ON p.id = z.idPojazdy 
-        LEFT JOIN DokSprzedazy ds ON ds.id = z.idDokSprzedazy
-        LEFT JOIN NotatkiDokSprzedazy nds ON nds.idDokSprzedazy = ds.id
-        WHERE
-            CAST(z.dataGodzinaZgloszenia AS DATE) = :selected_date
-            AND z.idStatusyZlecen = 2
-            AND (nds.tresc IS NULL OR nds.tresc = '' OR CHARINDEX('/', CAST(nds.tresc AS varchar(500))) = 0)
-            AND EXISTS (
-                SELECT 1 
-                FROM DokSprzedazy ds2
-                LEFT JOIN TowaryDokSprzedazy tds2 ON tds2.idDokSprzedazy = ds2.id
-                LEFT JOIN UslugiDokSprzedazy uds2 ON uds2.idDokSprzedazy = ds2.id
-                WHERE ds2.id = z.idDokSprzedazy 
-                AND (tds2.id IS NOT NULL OR uds2.id IS NOT NULL)
-            )
-    """)
-    
-    # ZAPYTANIE 3: Towary/Usługi wszystkich zleceń
-    query_towary_uslugi = text("""
-        SELECT 
-            p.nrRejestracyjny as rej,
-            STRING_AGG(t.nazwa + ' (' + ISNULL(t.nrKatalogowyBK, '') + ') ' + CAST(tds.ilosc as varchar) + ' szt', ', ') as towary_szczegoly,
+            STRING_AGG(t.nazwa + ' (nr katalogowy: ' + ISNULL(t.nrKatalogowyBK, '') + ') '+ CAST(tds.ilosc AS varchar) + ' szt',', ') as towary_szczegoly,
             STRING_AGG(u.nazwa, ', ') as uslugi_szczegoly
         FROM zlecenia z
         INNER JOIN Pojazdy p ON p.id = z.idPojazdy
@@ -307,12 +332,11 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
     """)
     
     try:
-        # Wykonaj wszystkie zapytania
+        # Wykonaj oba zapytania
         opony_rows = db.execute(query_opony, {"selected_date": selected_date}).fetchall()
-        towary_only_rows = db.execute(query_tylko_towary, {"selected_date": selected_date}).fetchall()
-        towary_rows = db.execute(query_towary_uslugi, {"selected_date": selected_date}).fetchall()
+        towary_rows = db.execute(query_tylko_towary_uslugi, {"selected_date": selected_date}).fetchall()
         
-        print(f"🔍 Opony: {len(opony_rows)}, Tylko towary: {len(towary_only_rows)}, Towary/Usługi: {len(towary_rows)}")
+        print(f"🔍 Opony: {len(opony_rows)}, Towary/Usługi: {len(towary_rows)}")
         
         # Słownik towarów/usług
         towary_dict = {}
@@ -322,12 +346,14 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
                 'uslugi_szczegoly': row.uslugi_szczegoly
             }
         
-        # Łącz wszystkie dane
+        # Zbiór pojazdów z oponami
+        pojazdy_z_oponami = set()
         data = []
         
         # Dodaj opony z notatkami
         for row in opony_rows:
             rej = row.rej
+            pojazdy_z_oponami.add(rej)
             towary_info = towary_dict.get(rej, {'towary_szczegoly': None, 'uslugi_szczegoly': None})
             
             data.append({
@@ -346,33 +372,31 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
                 "typ_rekordu": "opony"
             })
         
-        # Dodaj zlecenia tylko z towarami (bez opon)
-        for row in towary_only_rows:
-            rej = row.rej
-            towary_info = towary_dict.get(rej, {'towary_szczegoly': None, 'uslugi_szczegoly': None})
-            
-            data.append({
-                "rej": rej,
-                "name": None,
-                "wheels": None,
-                "rodzaj_opony": None,
-                "bieznik": None,
-                "lokalizacja": None,
-                "opisOponyKPO": None,
-                "kartaprzechowywalniuwagi": None,
-                "numer_z_karty": None,
-                "notatka": row.notatka,
-                "towary_szczegoly": towary_info['towary_szczegoly'],
-                "uslugi_szczegoly": towary_info['uslugi_szczegoly'],
-                "typ_rekordu": "tylko_towary"
-            })
+        # Dodaj pojazdy które mają tylko towary (bez opon)
+        for rej, towary_info in towary_dict.items():
+            if rej not in pojazdy_z_oponami:  # Nie ma opon
+                data.append({
+                    "rej": rej,
+                    "name": None,
+                    "wheels": None,
+                    "rodzaj_opony": None,
+                    "bieznik": None,
+                    "lokalizacja": None,
+                    "opisOponyKPO": None,
+                    "kartaprzechowywalniuwagi": None,
+                    "numer_z_karty": None,
+                    "notatka": None,
+                    "towary_szczegoly": towary_info['towary_szczegoly'],
+                    "uslugi_szczegoly": towary_info['uslugi_szczegoly'],
+                    "typ_rekordu": "tylko_towary"
+                })
         
         return data
         
     except Exception as e:
         print(f"❌ Błąd get_zlecenia_na_dzien: {e}")
         return []
-
+    
 def get_pojazdy_zlecenia_grouped(db: Session, selected_date: str) -> List[Dict[str, Any]]:
     """
     Grupuje zlecenia - obsługuje opony z notatkami i zlecenia tylko z towarami
@@ -435,7 +459,9 @@ def get_pojazdy_zlecenia_grouped(db: Session, selected_date: str) -> List[Dict[s
                 {
                     'numer_depozytu': depot_num,
                     'opony_count': len(depot_data['opony']),
-                    'opony': depot_data['opony']
+                    'opony': depot_data['opony'],
+                    'kartaprzechowywalniuwagi': depot_data['opony'][0]['kartaprzechowywalniuwagi'] if depot_data['opony'] else None
+
                 }
                 for depot_num, depot_data in vehicle['depozyty'].items()
             ]

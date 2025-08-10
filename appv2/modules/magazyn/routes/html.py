@@ -49,6 +49,7 @@ async def magazyn_home(request: Request, db: Session = Depends(get_samochody_db)
         "selected_date": None,
         "pojazdy_grouped": [],  # dla terminarza
         "pojazdy_zlecenia_grouped": pojazdy_zlecenia_grouped,  # dla zleceń
+        "tylko_towar": False,  # dodane dla checkboxa
         "error_message": error_message,
     })
 
@@ -58,15 +59,20 @@ async def magazyn_search(
     request: Request,
     selected_date: str = Form(...),
     tab: Optional[str] = Form("terminarz"),
+    tylko_towar: Optional[str] = Form(None),  # nowy parametr checkbox
     db: Session = Depends(get_samochody_db),
 ):
     """
     Obsługa formularzy:
     - tab == 'terminarz'  -> render harmonogramu na wybraną datę
     - tab == 'zlecenia'   -> zlecenia na wybraną datę
+    - tylko_towar == '1'  -> filtrowanie tylko towarów (tylko dla terminarza)
     """
     dzisiejsza_data = today_str()
     error_message: Optional[str] = None
+    
+    # Konwersja checkboxa na boolean
+    tylko_towar_bool = tylko_towar == "1"
 
     if tab == "terminarz":
         try:
@@ -82,6 +88,7 @@ async def magazyn_search(
             "selected_date": selected_date,
             "pojazdy_grouped": pojazdy_grouped,
             "pojazdy_zlecenia_grouped": [],  # puste dla terminarza
+            "tylko_towar": tylko_towar_bool,  # przekaż stan checkboxa
             "error_message": error_message,
         })
 
@@ -99,6 +106,7 @@ async def magazyn_search(
             "selected_date": selected_date,
             "pojazdy_grouped": [],  # puste dla zleceń
             "pojazdy_zlecenia_grouped": pojazdy_zlecenia_grouped,
+            "tylko_towar": False,  # checkbox tylko w terminarzu
             "error_message": error_message,
         })
 
@@ -116,5 +124,6 @@ async def magazyn_search(
         "selected_date": selected_date,
         "pojazdy_grouped": pojazdy_grouped,
         "pojazdy_zlecenia_grouped": [],
+        "tylko_towar": tylko_towar_bool,
         "error_message": error_message,
     })

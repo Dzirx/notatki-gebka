@@ -1,47 +1,272 @@
-<!-- MODAL: DODAJ NOTATKĘ -->
+<!-- MODAL: DODAJ NOTATKĘ - NOWA WERSJA -->
 <div id="noteModal" class="modal">
-    <div class="modal-content" style="max-width: 900px;">
+    <div class="modal-content" style="max-width: 1000px; width: 95%; max-height: 90vh; overflow-y: auto;">
         <span class="close" onclick="closeModal()">&times;</span>
-        <h3>Dodaj Notatkę</h3>
-        <form action="/notatnik/add" method="post">
+        <h3>📝 Dodaj Notatkę</h3>
+        
+        <form action="/notatnik/add" method="post" id="addNoteForm">
+            <!-- KROK 1: WYBÓR TYPU (zawsze widoczny) -->
             <div class="form-group">
                 <label>Wybierz typ notatki:</label>
-                <div style="display: flex; gap: 10px; margin: 10px 0;">
-                    <button type="button" class="btn btn-secondary" data-type="szybka" onclick="selectNoteType('szybka')">
+                <div style="display: flex; gap: 15px; margin: 15px 0;">
+                    <button type="button" class="btn btn-secondary note-type-btn" data-type="szybka" onclick="selectNoteType('szybka')">
                         ⚡ Szybka notatka
                     </button>
-                    <button type="button" class="btn btn-secondary" data-type="pojazd" onclick="selectNoteType('pojazd')">
+                    <button type="button" class="btn btn-secondary note-type-btn" data-type="pojazd" onclick="selectNoteType('pojazd')">
                         🚙 Notatka do pojazdu
                     </button>
                 </div>
                 <input type="hidden" id="typ_notatki" name="typ_notatki" required>
             </div>
-            
-            <div id="nr_rej_group" class="form-group hidden">
-                <label>Numer rejestracyjny pojazdu:</label>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <input type="text" id="nr_rejestracyjny" name="nr_rejestracyjny" placeholder="np. LLB58411" style="flex: 1;">
-                    <button type="button" class="btn btn-primary" onclick="pobierzInformacje()">📋 Pobierz z integra</button>
-                    <button type="button" onclick="syncTowary()">🔄 Synchronizuj towary</button>
+
+            <!-- SEKCJA POJAZDU (ukryta domyślnie) -->
+            <div id="vehicleSection" class="hidden">
+                <div class="card" style="margin-bottom: 20px;">
+                    <h4>🚗 Dane pojazdu</h4>
+                    <div class="form-group">
+                        <label>Numer rejestracyjny pojazdu:</label>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <input type="text" id="nr_rejestracyjny" name="nr_rejestracyjny" 
+                                   placeholder="np. GDA55555" style="flex: 1; min-width: 200px;">
+                            <button type="button" class="btn btn-info" onclick="pobierzKosztorysyZIntegra()">
+                                📋 Pobierz kosztorysy z integra
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SEKCJA KOSZTORYSÓW Z INTEGRA -->
+                <div id="integraSection" class="card hidden" style="margin-bottom: 20px;">
+                    <h4>📥 Kosztorysy z systemu integra</h4>
+                    <div id="integraResults">
+                        <!-- Tutaj będą wyniki z integra -->
+                    </div>
+                </div>
+
+                <!-- SEKCJA WŁASNEGO KOSZTORYSU -->
+                <div id="customCostSection" class="card" style="margin-bottom: 20px;">
+                    <h4>➕ Dodaj własny kosztorys</h4>
+                    
+                    <div class="form-group">
+                        <label>Numer kosztorysu:</label>
+                        <input type="text" id="customCostNumber" placeholder="np. KOS-2024-001">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Opis kosztorysu:</label>
+                        <textarea id="customCostDescription" placeholder="Opis prac..." style="min-height: 60px;"></textarea>
+                    </div>
+
+                    <!-- TOWARY -->
+                    <div style="margin: 20px 0;">
+                        <h5>📦 Towary</h5>
+                        <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+                            <select id="selectTowar" style="flex: 1; min-width: 200px;">
+                                <option value="">-- Ładowanie towarów... --</option>
+                            </select>
+                            <input type="number" id="towarIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
+                            <input type="number" id="towarCena" placeholder="Cena" step="0.01" style="width: 120px;">
+                            <button type="button" class="btn btn-success" onclick="addTowarToCost()">+ Dodaj</button>
+                        </div>
+                        
+                        <!-- WŁASNY TOWAR -->
+                        <details style="margin-bottom: 15px;">
+                            <summary style="cursor: pointer; color: #007bff;">➕ Dodaj własny towar</summary>
+                            <div style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; display: flex; gap: 10px; flex-wrap: wrap;">
+                                <input type="text" id="customTowarNazwa" placeholder="Nazwa towaru" style="flex: 1; min-width: 150px;">
+                                <input type="number" id="customTowarIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
+                                <input type="number" id="customTowarCena" placeholder="Cena" step="0.01" style="width: 120px;">
+                                <button type="button" class="btn btn-primary" onclick="addCustomTowarToCost()">+ Dodaj własny</button>
+                            </div>
+                        </details>
+                        
+                        <div id="selectedTowary"></div>
+                    </div>
+
+                    <!-- USŁUGI -->
+                    <div style="margin: 20px 0;">
+                        <h5>🔧 Usługi</h5>
+                        <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+                            <select id="selectUsluga" style="flex: 1; min-width: 200px;">
+                                <option value="">-- Ładowanie usług... --</option>
+                            </select>
+                            <input type="number" id="uslugaIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
+                            <input type="number" id="uslugaCena" placeholder="Cena" step="0.01" style="width: 120px;">
+                            <button type="button" class="btn btn-success" onclick="addUslugaToCost()">+ Dodaj</button>
+                        </div>
+                        
+                        <!-- WŁASNA USŁUGA -->
+                        <details style="margin-bottom: 15px;">
+                            <summary style="cursor: pointer; color: #007bff;">➕ Dodaj własną usługę</summary>
+                            <div style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; display: flex; gap: 10px; flex-wrap: wrap;">
+                                <input type="text" id="customUslugaNazwa" placeholder="Nazwa usługi" style="flex: 1; min-width: 150px;">
+                                <input type="number" id="customUslugaIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
+                                <input type="number" id="customUslugaCena" placeholder="Cena" step="0.01" style="width: 120px;">
+                                <button type="button" class="btn btn-primary" onclick="addCustomUslugaToCost()">+ Dodaj własną</button>
+                            </div>
+                        </details>
+                        
+                        <div id="selectedUslugi"></div>
+                    </div>
+
+                    <!-- PODSUMOWANIE KOSZTORYSU -->
+                    <div id="costSummary" style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-top: 20px; display: none;">
+                        <h5>💵 Podsumowanie kosztorysu</h5>
+                        <div id="costTotal" style="font-size: 1.2em; font-weight: bold; color: #28a745;"></div>
+                    </div>
                 </div>
             </div>
-            
-            <div id="pojazd_info" class="hidden" style="background: #e7f3ff; padding: 15px; margin: 10px 0; border-radius: 6px; max-height: 500px; overflow-y: auto;">
-                <!-- Informacje o pojeździe i kosztorysy będą tu -->
+
+            <!-- TREŚĆ NOTATKI (zawsze na końcu) -->
+            <div id="noteContentSection" class="hidden">
+                <div class="form-group">
+                    <label>Treść notatki:</label>
+                    <textarea name="tresc" id="noteTresc" placeholder="Opisz wykonane prace, ustalone ustalenia lub uwagi..." required style="min-height: 100px;"></textarea>
+                </div>
             </div>
-            
-            <div class="form-group">
-                <label>Treść notatki:</label>
-                <textarea name="tresc" placeholder="Opisz wykonane prace, ustalone ustalenia lub uwagi..." required></textarea>
-            </div>
-            
-            <!-- UKRYTE POLE DLA IMPORTOWANYCH KOSZTORYSÓW -->
+
+            <!-- UKRYTE POLA -->
             <input type="hidden" id="importowane_kosztorysy" name="importowane_kosztorysy" value="">
-            
-            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 25px;">
+            <input type="hidden" id="towary_json" name="towary_json" value="[]">
+            <input type="hidden" id="uslugi_json" name="uslugi_json" value="[]">
+            <input type="hidden" id="numer_kosztorysu" name="numer_kosztorysu" value="">
+            <input type="hidden" id="opis_kosztorysu" name="opis_kosztorysu" value="">
+
+            <!-- PRZYCISKI AKCJI -->
+            <div id="actionButtons" class="hidden" style="display: flex; gap: 15px; justify-content: center; margin-top: 25px;">
                 <button type="submit" class="btn btn-success">💾 Zapisz notatkę</button>
                 <button type="button" class="btn btn-secondary" onclick="closeModal()">❌ Anuluj</button>
             </div>
         </form>
     </div>
 </div>
+
+<style>
+/* Style dla nowego modala */
+#noteModal .modal-content {
+    margin: 2% auto;  /* Dodaj margines góra/dół */
+}
+
+#noteModal .card {
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#noteModal .card h4, #noteModal .card h5 {
+    margin-top: 0;
+    color: #495057;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 8px;
+    margin-bottom: 15px;
+}
+
+#noteModal .form-group {
+    margin-bottom: 15px;
+}
+
+#noteModal .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #495057;
+}
+
+#noteModal input, #noteModal select, #noteModal textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+#noteModal input:focus, #noteModal select:focus, #noteModal textarea:focus {
+    outline: none;
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+}
+
+.note-type-btn.active {
+    background-color: #007bff !important;
+    color: white !important;
+    border-color: #007bff !important;
+}
+
+.cost-item {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cost-item .item-info {
+    flex: 1;
+}
+
+.cost-item .item-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.integra-kosztorys {
+    background: #e3f2fd;
+    border: 1px solid #2196f3;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.integra-kosztorys h5 {
+    margin: 0 0 10px 0;
+    color: #1976d2;
+}
+
+/* Animacje płynnego pokazywania */
+.hidden {
+    display: none !important;
+}
+
+.slide-in {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from { 
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsywność */
+@media (max-width: 768px) {
+    #noteModal .modal-content {
+        width: 98%;
+        margin: 1% auto;
+    }
+    
+    #noteModal .card {
+        padding: 15px;
+    }
+    
+    #noteModal input, #noteModal select {
+        margin-bottom: 10px;
+    }
+    
+    .cost-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+}
+</style>

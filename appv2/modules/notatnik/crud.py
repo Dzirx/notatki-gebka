@@ -371,3 +371,69 @@ def get_or_create_usluga_by_id(db: Session, usluga_id: int, nazwa: str, cena: fl
             print(f"🔄 Zaktualizowano cenę usługi: {nazwa} (ID: {usluga_id})")
     
     return usluga
+
+# === DODAJ TE FUNKCJE DO modules/notatnik/crud.py ===
+
+def get_notatka_szczegoly(db: Session, notatka_id: int):
+    """Pobiera notatkę z pełnymi danymi samochodu i klienta"""
+    return db.query(Notatka).options(
+        joinedload(Notatka.samochod).joinedload(Samochod.klient)
+    ).filter(Notatka.id == notatka_id).first()
+
+def create_custom_towar(db: Session, nazwa: str, cena: float):
+    """Tworzy własny towar (nie z bazy integra)"""
+    from models import Towar
+    
+    # Sprawdź czy towar o tej nazwie już istnieje
+    existing = db.query(Towar).filter(Towar.nazwa == nazwa).first()
+    if existing:
+        return existing
+    
+    towar = Towar(
+        nazwa=nazwa,
+        cena=cena
+    )
+    db.add(towar)
+    db.commit()
+    db.refresh(towar)
+    return towar
+
+def create_custom_usluga(db: Session, nazwa: str, cena: float):
+    """Tworzy własną usługę (nie z bazy integra)"""
+    from models import Usluga
+    
+    # Sprawdź czy usługa o tej nazwie już istnieje
+    existing = db.query(Usluga).filter(Usluga.nazwa == nazwa).first()
+    if existing:
+        return existing
+    
+    usluga = Usluga(
+        nazwa=nazwa,
+        cena=cena
+    )
+    db.add(usluga)
+    db.commit()
+    db.refresh(usluga)
+    return usluga
+
+def delete_kosztorys(db: Session, kosztorys_id: int):
+    """Usuwa kosztorys wraz z wszystkimi pozycjami"""
+    try:
+        # Usuń pozycje kosztorysu
+        db.query(KosztorysTowar).filter(KosztorysTowar.kosztorys_id == kosztorys_id).delete()
+        db.query(KosztorysUsluga).filter(KosztorysUsluga.kosztorys_id == kosztorys_id).delete()
+        
+        # Usuń kosztorys
+        kosztorys = db.query(Kosztorys).filter(Kosztorys.id == kosztorys_id).first()
+        if kosztorys:
+            db.delete(kosztorys)
+            db.commit()
+            return True
+        return False
+    except Exception as e:
+        db.rollback()
+        print(f"Błąd usuwania kosztorysu {kosztorys_id}: {e}")
+        return False
+
+# POPRAWKA: Dodaj brakujący import na górze pliku
+from sqlalchemy import func

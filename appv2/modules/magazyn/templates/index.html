@@ -58,7 +58,7 @@
                                     <th>Nr Rejestracyjny</th>
                                     <th>Do wydania</th>
                                     <th>Lokalizacje</th>
-                                    <th>Notatka</th>
+                                    <th>Notatka zlecenia</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -67,16 +67,27 @@
                                     <td><strong>{{ pojazd.rej }}</strong></td>
                                     <td>
                                         {% if pojazd.ma_tylko_towary %}
-                                            <div style="font-size: 0.9em; color: #6c757d;">
-                                                Towar
+                                            <div class="status-icons" style="font-size: 0.9em; color: #6c757d; line-height: 1.4;">
+                                                {% if pojazd.towary_szczegoly and pojazd.towary_szczegoly.strip() %}
+                                                    📦 Towary<br>
+                                                {% endif %}
+                                                {% if pojazd.uslugi_szczegoly and pojazd.uslugi_szczegoly.strip() %}
+                                                    🛠️ Usługi
+                                                {% endif %}
+                                                {% if not pojazd.towary_szczegoly and not pojazd.uslugi_szczegoly %}
+                                                    <span style="color: #999;">Brak pozycji</span>
+                                                {% endif %}
                                             </div>
                                         {% else %}
-                                            <div style="font-size: 0.9em; color: #6c757d;">
+                                            <div class="status-icons" style="font-size: 0.9em; color: #6c757d; line-height: 1.4;">
                                                 {% for depozyt in pojazd.depozyty %}
-                                                    {{ depozyt.numer_depozytu }}<br>
+                                                    🔧 {{ depozyt.numer_depozytu }}<br>
                                                 {% endfor %}
                                                 {% if pojazd.towary_szczegoly and pojazd.towary_szczegoly.strip() %}
-                                                    Towar
+                                                    📦 Towary<br>
+                                                {% endif %}
+                                                {% if pojazd.uslugi_szczegoly and pojazd.uslugi_szczegoly.strip() %}
+                                                    🛠️ Usługi
                                                 {% endif %}
                                             </div>
                                         {% endif %}
@@ -99,7 +110,17 @@
                                             
                                             {% if pojazd.ma_tylko_towary %}
                                             <!-- ZLECENIE TYLKO Z TOWARAMI -->
-                                            <h4>📦 Zlecenie bez opon - tylko towary</h4>
+                                            <h4>
+                                                {% if pojazd.towary_szczegoly and pojazd.uslugi_szczegoly %}
+                                                    📦🔧 Zlecenie - towary i usługi
+                                                {% elif pojazd.towary_szczegoly %}
+                                                    📦 Zlecenie - tylko towary
+                                                {% elif pojazd.uslugi_szczegoly %}
+                                                    🔧 Zlecenie - tylko usługi
+                                                {% else %}
+                                                    ❓ Zlecenie bez pozycji
+                                                {% endif %}
+                                            </h4>
                                             
                                             {% else %}
                                             <!-- ZLECENIE Z OPONAMI -->

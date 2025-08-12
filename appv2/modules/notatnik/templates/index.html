@@ -21,7 +21,7 @@
 
         <!-- WYSZUKIWANIE -->
         <div class="search-rej">
-            <input type="text" id="searchRejInput" placeholder="Wyszukaj po numerze rejestracyjnym..." oninput="filterNotatkiByRej()">
+            <input type="text" id="searchRejInput" placeholder="Wyszukaj po numerze rejestracyjnym lub treści notatki..." oninput="filterNotatkiByRej()">
             <button class="btn-secondary" onclick="clearRejSearch()">Wyczyść</button>
         </div>
 
@@ -49,7 +49,7 @@
             </thead>
             <tbody>
                 {% for notatka in notatki %}
-                <tr class="notatka-{{ notatka.typ_notatki }}" data-nr-rej="{% if notatka.samochod %}{{ notatka.samochod.nr_rejestracyjny }}{% endif %}">
+                <tr class="notatka-{{ notatka.typ_notatki }}" data-note-id="{{ notatka.id }}" data-nr-rej="{% if notatka.samochod %}{{ notatka.samochod.nr_rejestracyjny }}{% endif %}">
                     <td>
                         <input type="checkbox" class="note-checkbox" value="{{ notatka.id }}">
                     </td>
@@ -69,7 +69,7 @@
                             -
                         {% endif %}
                     </td>
-                    <td>{{ notatka.tresc }}</td>
+                    <td class="note-content">{{ notatka.tresc }}</td>
                     <td>
                         {% if notatka.kosztorysy %}
                             <a href="/notatnik/kosztorys/{{ notatka.id }}" class="btn-small">
@@ -89,6 +89,9 @@
         {% include 'modals/edit_note_modal.html' %}
     </div>
 
+    <script src="/modules/notatnik/static/js/note-core.js"></script>
+    <script src="/modules/notatnik/static/js/note-add.js"></script>  
+    <script src="/modules/notatnik/static/js/note-edit.js"></script>
     <script src="/modules/notatnik/static/js/note.js"></script>
 </body>
 </html>

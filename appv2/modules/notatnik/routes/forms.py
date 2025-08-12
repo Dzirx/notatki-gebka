@@ -105,19 +105,43 @@ async def add_notatka(
         )
         
         for towar in wybrane_towary:
+            if towar.get('isCustom'):
+                # Własny towar - utwórz nowy
+                custom_towar = crud.create_custom_towar(
+                    db, 
+                    towar['nazwa'], 
+                    float(towar['cena'])
+                )
+                towar_id = custom_towar.id
+            else:
+                # Istniejący towar z bazy
+                towar_id = int(towar['id'])
+            
             crud.add_towar_do_kosztorysu(
                 db=db,
                 kosztorys_id=kosztorys.id,
-                towar_id=int(towar['id']),
+                towar_id=towar_id,
                 ilosc=float(towar['ilosc']),
                 cena=float(towar['cena'])
             )
         
         for usluga in wybrane_uslugi:
+            if usluga.get('isCustom'):
+                # Własna usługa - utwórz nową
+                custom_usluga = crud.create_custom_usluga(
+                    db,
+                    usluga['nazwa'], 
+                    float(usluga['cena'])
+                )
+                usluga_id = custom_usluga.id
+            else:
+                # Istniejąca usługa z bazy
+                usluga_id = int(usluga['id'])
+            
             crud.add_usluge_do_kosztorysu(
                 db=db,
                 kosztorys_id=kosztorys.id,
-                usluga_id=int(usluga['id']),
+                usluga_id=usluga_id,
                 ilosc=float(usluga['ilosc']),
                 cena=float(usluga['cena'])
             )

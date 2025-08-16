@@ -2,6 +2,7 @@
 // Podstawowe funkcje notatnika
 
 console.log('📝 Moduł note-core załadowany');
+let showingCompleted = false;
 
 // MODALE - podstawowe funkcje
 function openModal() {
@@ -441,17 +442,64 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
-// Ukryj menu statusów po kliknięciu poza nim
-document.addEventListener('click', function(event) {
-    if (!event.target.closest('.status-container')) {
-        document.querySelectorAll('.status-menu').forEach(menu => {
-            menu.classList.remove('show');
-            setTimeout(() => {
-                menu.style.display = 'none';
-                menu.classList.remove('menu-up');
-            }, 200);
-        });
+function toggleCompletedNotes() {
+    const btn = document.getElementById('toggleCompletedBtn');
+    const table = document.querySelector('table');
+    
+    showingCompleted = !showingCompleted;
+    
+    if (showingCompleted) {
+        // Pokaż TYLKO zakończone
+        table.classList.add('only-completed');
+        btn.textContent = '📋 Wszystkie notatki';
+        btn.classList.add('active');
+    } else {
+        // Pokaż wszystkie OPRÓCZ zakończonych
+        table.classList.remove('only-completed');
+        btn.textContent = '✅ Tylko zakończone';
+        btn.classList.remove('active');
     }
+    
+    // Usuń licznik - nie potrzebny
+    const counter = document.getElementById('notes-counter');
+    if (counter) {
+        counter.remove();
+    }
+}
+
+function updateNotesCounter() {
+    const totalNotes = document.querySelectorAll('tbody tr').length;
+    const visibleNotes = document.querySelectorAll('tbody tr:not([style*="display: none"])').length;
+    
+    // Znajdź lub utwórz licznik
+    let counter = document.getElementById('notes-counter');
+    if (!counter) {
+        counter = document.createElement('span');
+        counter.id = 'notes-counter';
+        counter.style.cssText = 'margin-left: 15px; color: #28a745; font-weight: bold;';
+        document.querySelector('.actions-bar').appendChild(counter);
+    }
+    
+    if (showingCompleted) {
+        counter.textContent = `📊 Widoczne: ${visibleNotes}/${totalNotes} notatek`;
+    } else {
+        const completedCount = totalNotes - visibleNotes;
+        counter.textContent = `📊 Widoczne: ${visibleNotes}/${totalNotes} (ukryte: ${completedCount} zakończone)`;
+    }
+}
+
+// Ukryj menu statusów po kliknięciu poza nim
+document.addEventListener('DOMContentLoaded', function() {
+    // Dodaj atrybut data-status do wierszy na podstawie klasy
+    document.querySelectorAll('tbody tr').forEach(row => {
+        const statusBadge = row.querySelector('.status-badge');
+        if (statusBadge) {
+            // Sprawdź klasę CSS badge'a
+            if (statusBadge.classList.contains('status-zakonczona')) {
+                row.setAttribute('data-status', 'zakonczona');
+            }
+        }
+    });
 });
 
-console.log('✅ note-core.js załadowany');
+console.log('✅ Filtr zakończonych notatek załadowany');

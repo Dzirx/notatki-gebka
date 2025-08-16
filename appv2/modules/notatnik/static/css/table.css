@@ -339,3 +339,42 @@ th {
         font-size: 11px;
     }
 }
+
+tr[data-status="zakonczona"] {
+    display: none;
+}
+
+/* TRYB: TYLKO ZAKOŃCZONE */
+.only-completed tr:not([data-status="zakonczona"]) {
+    display: none;
+}
+
+.only-completed tr[data-status="zakonczona"] {
+    display: table-row;
+}
+
+.actions-bar button {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    margin-right: 10px;
+}
+
+.actions-bar button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.actions-bar .btn-warning { background: #ffc107; color: #212529; }
+.actions-bar .btn-danger { background: #dc3545; color: white; }
+.actions-bar .btn-info { background: #17a2b8; color: white; }
+
+.actions-bar .btn-info.active {
+    background: #0c7489;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+    transform: translateY(0);
+}

@@ -1,0 +1,151 @@
+<!-- === UTWÓRZ PLIK: modules/notatnik/templates/kosztorys_single.html === -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kosztorys {{ kosztorys.numer }} - Notatnik Warsztatowy</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/modules/notatnik/static/css/table.css">
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <h1>💰 Kosztorys {{ kosztorys.numer }}</h1>
+            <div>
+                <a href="/notatnik" class="btn-secondary">← Powrót do notatek</a>
+                <a href="/notatnik/kosztorys/{{ notatka.id }}" class="btn-info">📋 Wszystkie kosztorysy</a>
+            </div>
+        </div>
+
+        <!-- INFORMACJE O NOTATCE -->
+        <div class="card" style="margin-bottom: 20px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+            <h3>📝 Powiązana notatka</h3>
+            <p><strong>Treść:</strong> {{ notatka.tresc }}</p>
+            <p><strong>Typ:</strong> {{ notatka.typ_notatki|title }}</p>
+            {% if notatka.samochod %}
+            <p><strong>Pojazd:</strong> {{ notatka.samochod.marka }} {{ notatka.samochod.model }} ({{ notatka.samochod.nr_rejestracyjny }})</p>
+            {% endif %}
+        </div>
+
+        <!-- SZCZEGÓŁY KOSZTORYSU -->
+        <div class="card" style="margin-bottom: 20px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h3>💰 Szczegóły kosztorysu</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0;">
+                <div>
+                    <strong>Numer:</strong><br>
+                    <span style="font-size: 1.2em; color: #007bff;">{{ kosztorys.numer }}</span>
+                </div>
+                <div>
+                    <strong>Status:</strong><br>
+                    <span class="status-badge status-{{ kosztorys.status }}">{{ kosztorys.status|title }}</span>
+                </div>
+                <div>
+                    <strong>Data utworzenia:</strong><br>
+                    {{ kosztorys.created_at.strftime('%d.%m.%Y %H:%M') }}
+                </div>
+                <div>
+                    <strong>Kwota całkowita:</strong><br>
+                    <span style="font-size: 1.4em; font-weight: bold; color: #28a745;">{{ "%.2f"|format(kosztorys.kwota_calkowita) }} zł</span>
+                </div>
+            </div>
+            
+            {% if kosztorys.opis %}
+            <div style="margin-top: 20px;">
+                <strong>Opis:</strong>
+                <p style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-top: 10px;">{{ kosztorys.opis }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- TOWARY -->
+        {% if kosztorys.towary %}
+        <div class="card" style="margin-bottom: 20px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h3>📦 Towary</h3>
+            <table style="margin-top: 15px;">
+                <thead>
+                    <tr>
+                        <th>Nazwa towaru</th>
+                        <th style="text-align: center;">Ilość</th>
+                        <th style="text-align: right;">Cena jedn.</th>
+                        <th style="text-align: right;">Wartość</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for towar in kosztorys.towary %}
+                    <tr>
+                        <td>{{ towar.nazwa }}</td>
+                        <td style="text-align: center;">{{ towar.ilosc }}</td>
+                        <td style="text-align: right;">{{ "%.2f"|format(towar.cena) }} zł</td>
+                        <td style="text-align: right; font-weight: bold;">{{ "%.2f"|format(towar.wartosc) }} zł</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="background: #f8f9fa; font-weight: bold;">
+                        <td colspan="3">Suma towarów:</td>
+                        <td style="text-align: right;">
+                            {% set towary_suma = kosztorys.towary|sum(attribute='wartosc') %}
+                            {{ "%.2f"|format(towary_suma) }} zł
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- USŁUGI -->
+        {% if kosztorys.uslugi %}
+        <div class="card" style="margin-bottom: 20px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h3>🔧 Usługi</h3>
+            <table style="margin-top: 15px;">
+                <thead>
+                    <tr>
+                        <th>Nazwa usługi</th>
+                        <th style="text-align: center;">Ilość</th>
+                        <th style="text-align: right;">Cena jedn.</th>
+                        <th style="text-align: right;">Wartość</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for usluga in kosztorys.uslugi %}
+                    <tr>
+                        <td>{{ usluga.nazwa }}</td>
+                        <td style="text-align: center;">{{ usluga.ilosc }}</td>
+                        <td style="text-align: right;">{{ "%.2f"|format(usluga.cena) }} zł</td>
+                        <td style="text-align: right; font-weight: bold;">{{ "%.2f"|format(usluga.wartosc) }} zł</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="background: #f8f9fa; font-weight: bold;">
+                        <td colspan="3">Suma usług:</td>
+                        <td style="text-align: right;">
+                            {% set uslugi_suma = kosztorys.uslugi|sum(attribute='wartosc') %}
+                            {{ "%.2f"|format(uslugi_suma) }} zł
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- PODSUMOWANIE -->
+        <div class="card" style="padding: 20px; background: #e8f5e8; border-radius: 8px; border-left: 5px solid #28a745;">
+            <h3>📊 Podsumowanie</h3>
+            <div style="font-size: 1.2em;">
+                {% set towary_suma = kosztorys.towary|sum(attribute='wartosc') %}
+                {% set uslugi_suma = kosztorys.uslugi|sum(attribute='wartosc') %}
+                <p><strong>Towary:</strong> {{ "%.2f"|format(towary_suma) }} zł</p>
+                <p><strong>Usługi:</strong> {{ "%.2f"|format(uslugi_suma) }} zł</p>
+                <hr>
+                <p style="font-size: 1.4em; font-weight: bold; color: #28a745;">
+                    <strong>RAZEM: {{ "%.2f"|format(kosztorys.kwota_calkowita) }} zł</strong>
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

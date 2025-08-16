@@ -21,7 +21,7 @@
 
         <!-- WYSZUKIWANIE -->
         <div class="search-rej">
-            <input type="text" id="searchRejInput" placeholder="Wyszukaj po numerze rejestracyjnym..." oninput="filterNotatkiByRej()">
+            <input type="text" id="searchRejInput" placeholder="Wyszukaj po numerze rejestracyjnym lub treści notatki..." oninput="filterNotatkiByRej()">
             <button class="btn-secondary" onclick="clearRejSearch()">Wyczyść</button>
         </div>
 
@@ -40,6 +40,7 @@
                     <th width="40">
                         <input type="checkbox" id="selectAll" onchange="toggleAllCheckboxes()">
                     </th>
+                    <th>Status</th>
                     <th>Data</th>
                     <th>Właściciel</th>
                     <th>Pojazd</th>
@@ -49,9 +50,44 @@
             </thead>
             <tbody>
                 {% for notatka in notatki %}
-                <tr class="notatka-{{ notatka.typ_notatki }}" data-nr-rej="{% if notatka.samochod %}{{ notatka.samochod.nr_rejestracyjny }}{% endif %}">
+                <tr class="notatka-{{ notatka.typ_notatki }}" data-note-id="{{ notatka.id }}" data-nr-rej="{% if notatka.samochod %}{{ notatka.samochod.nr_rejestracyjny }}{% endif %}">
                     <td>
                         <input type="checkbox" class="note-checkbox" value="{{ notatka.id }}">
+                    </td>
+                    <td>
+                        <div class="status-container">
+                            <span class="status-badge status-{{ notatka.status|default('nowa') }}" 
+                                  onclick="showStatusMenu({{ notatka.id }}, this)"
+                                  title="Kliknij aby zmienić status">
+                {% if notatka.status == 'w_trakcie' %}🟡 W trakcie
+                                {% elif notatka.status == 'zakonczona' %}🟢 Zakończona
+                                {% elif notatka.status == 'anulowana' %}🔴 Anulowana
+                                {% elif notatka.status == 'oczekuje' %}🟠 Oczekuje
+                                {% else %}🔵 Nowa{% endif %}
+                            </span>
+                            <div class="status-menu" id="statusMenu{{ notatka.id }}" style="display: none;">
+                                <div class="status-option {% if (notatka.status or 'nowa') == 'nowa' %}current{% endif %}" 
+                                     data-status="nowa" data-text="Nowa" onclick="selectStatusFromMenu({{ notatka.id }}, this)">
+                                    🔵 Nowa
+                                </div>
+                                <div class="status-option {% if notatka.status == 'w_trakcie' %}current{% endif %}" 
+                                     data-status="w_trakcie" data-text="W trakcie" onclick="selectStatusFromMenu({{ notatka.id }}, this)">
+                                    🟡 W trakcie
+                                </div>
+                                <div class="status-option {% if notatka.status == 'zakonczona' %}current{% endif %}" 
+                                     data-status="zakonczona" data-text="Zakonczona" onclick="selectStatusFromMenu({{ notatka.id }}, this)">
+                                    🟢 Zakończona
+                                </div>
+                                <div class="status-option {% if notatka.status == 'anulowana' %}current{% endif %}" 
+                                     data-status="anulowana" data-text="Anulowana" onclick="selectStatusFromMenu({{ notatka.id }}, this)">
+                                    🔴 Anulowana
+                                </div>
+                                <div class="status-option {% if notatka.status == 'oczekuje' %}current{% endif %}" 
+                                     data-status="oczekuje" data-text="Oczekuje" onclick="selectStatusFromMenu({{ notatka.id }}, this)">
+                                    🟠 Oczekuje
+                                </div>
+                            </div>
+                        </div>
                     </td>
                     <td>{{ notatka.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
                     <td>
@@ -69,12 +105,14 @@
                             -
                         {% endif %}
                     </td>
-                    <td>{{ notatka.tresc }}</td>
+                    <td class="note-content">{{ notatka.tresc }}</td>
                     <td>
                         {% if notatka.kosztorysy %}
-                            <a href="/notatnik/kosztorys/{{ notatka.id }}" class="btn-small">
-                                💰 {{ "%.2f"|format(notatka.kosztorysy[0].kwota_calkowita) }} zł
-                            </a>
+                            {% for kosztorys in notatka.kosztorysy %}
+                                <a href="/notatnik/kosztorys/{{ notatka.id }}" class="btn-small" style="display: block; margin-bottom: 5px;">
+                                    💰 {{ kosztorys.numer_kosztorysu or 'KOS' }} - {{ "%.2f"|format(kosztorys.kwota_calkowita) }} zł
+                                </a>
+                            {% endfor %}
                         {% else %}
                             -
                         {% endif %}
@@ -89,6 +127,9 @@
         {% include 'modals/edit_note_modal.html' %}
     </div>
 
+    <script src="/modules/notatnik/static/js/note-core.js"></script>
+    <script src="/modules/notatnik/static/js/note-add.js"></script>  
+    <script src="/modules/notatnik/static/js/note-edit.js"></script>
     <script src="/modules/notatnik/static/js/note.js"></script>
 </body>
 </html>

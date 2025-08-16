@@ -40,11 +40,13 @@ class Notatka(Base):
     samochod_id = Column(Integer, ForeignKey("samochody.id"), nullable=True)
     typ_notatki = Column(String(20), nullable=False)
     tresc = Column(Text, nullable=False)
+    status = Column(String(20), default="aktywna")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
     __table_args__ = (
         CheckConstraint("typ_notatki IN ('szybka', 'pojazd')", name="check_typ_notatki"),
+        CheckConstraint("status IN ('aktywna', 'zakonczona', 'archiwum', 'anulowana')", name="check_status_notatki"),  # ← DODAJ TO
     )
     
     # Relacje

@@ -1,17 +1,234 @@
-<!-- MODAL: EDYTUJ NOTATKĘ -->
+<!-- ROZBUDOWANY MODAL: EDYTUJ NOTATKĘ Z KOSZTORYSAMI -->
 <div id="editModal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 1200px; width: 95%; max-height: 90vh; overflow-y: auto;">
         <span class="close" onclick="closeEditModal()">&times;</span>
-        <h3>Edytuj Notatkę</h3>
+        <h3>✏️ Edytuj Notatkę #<span id="editNoteId"></span></h3>
+        
         <form id="editForm">
-            <div class="form-group">
-                <label>Treść notatki:</label>
-                <textarea id="edit_tresc" placeholder="Treść notatki..." required></textarea>
+            <!-- PODSTAWOWE DANE NOTATKI -->
+            <div class="card" style="margin-bottom: 20px;">
+                <h4>📝 Treść notatki</h4>
+                <div class="form-group">
+                    <label>Treść:</label>
+                    <textarea id="edit_tresc" placeholder="Treść notatki..." required style="min-height: 80px;"></textarea>
+                </div>
             </div>
+
+            <!-- PRZYCISK IMPORTU Z INTEGRA (tylko dla pojazdów) -->
+            <div id="editImportSection" class="card" style="margin-bottom: 20px; display: none;">
+                <h4>📥 Import z systemu integra</h4>
+                <button type="button" class="btn btn-info" onclick="importFromIntegraEdit()">
+                    📥 Import kosztorysów z systemu integra
+                </button>
+                <div id="editIntegraResults" style="margin-top: 15px;"></div>
+            </div>
+
+            <!-- ISTNIEJĄCE KOSZTORYSY -->
+            <div id="editExistingCostEstimates" class="card" style="margin-bottom: 20px;">
+                <h4>💰 Istniejące kosztorysy</h4>
+                <div id="editExistingList">
+                    <p style="color: #6c757d; font-style: italic;">Ładowanie...</p>
+                </div>
+            </div>
+
+            <!-- NOWY KOSZTORYS -->
+            <div class="card" style="margin-bottom: 20px;">
+                <h4>➕ Dodaj nowy kosztorys</h4>
+                
+                <div class="form-group">
+                    <label>Numer kosztorysu:</label>
+                    <input type="text" id="editNewCostNumber" placeholder="np. KOS-2024-001">
+                </div>
+                
+                <div class="form-group">
+                    <label>Opis kosztorysu:</label>
+                    <textarea id="editNewCostDescription" placeholder="Opis prac..." style="min-height: 60px;"></textarea>
+                </div>
+
+                <!-- TOWARY -->
+                <div style="margin: 20px 0;">
+                    <h5>📦 Towary</h5>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+                        <select id="editSelectTowar" style="flex: 1; min-width: 200px;">
+                            <option value="">-- Wybierz towar --</option>
+                        </select>
+                        <input type="number" id="editTowarIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
+                        <input type="number" id="editTowarCena" placeholder="Cena" step="0.01" style="width: 120px;">
+                        <button type="button" class="btn btn-success" onclick="addTowarToEditCost()">+ Dodaj</button>
+                    </div>
+                    
+                    <!-- WŁASNY TOWAR -->
+                    <details style="margin-bottom: 15px;">
+                        <summary style="cursor: pointer; color: #007bff;">➕ Dodaj własny towar</summary>
+                        <div style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; display: flex; gap: 10px; flex-wrap: wrap;">
+                            <input type="text" id="editCustomTowarNazwa" placeholder="Nazwa towaru" style="flex: 1; min-width: 150px;">
+                            <input type="number" id="editCustomTowarIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
+                            <input type="number" id="editCustomTowarCena" placeholder="Cena" step="0.01" style="width: 120px;">
+                            <button type="button" class="btn btn-primary" onclick="addCustomTowarToEditCost()">+ Dodaj własny</button>
+                        </div>
+                    </details>
+                    
+                    <div id="editSelectedTowary"></div>
+                </div>
+
+                <!-- USŁUGI -->
+                <div style="margin: 20px 0;">
+                    <h5>🔧 Usługi</h5>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+                        <select id="editSelectUsluga" style="flex: 1; min-width: 200px;">
+                            <option value="">-- Wybierz usługę --</option>
+                        </select>
+                        <input type="number" id="editUslugaIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
+                        <input type="number" id="editUslugaCena" placeholder="Cena" step="0.01" style="width: 120px;">
+                        <button type="button" class="btn btn-success" onclick="addUslugaToEditCost()">+ Dodaj</button>
+                    </div>
+                    
+                    <!-- WŁASNA USŁUGA -->
+                    <details style="margin-bottom: 15px;">
+                        <summary style="cursor: pointer; color: #007bff;">➕ Dodaj własną usługę</summary>
+                        <div style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; display: flex; gap: 10px; flex-wrap: wrap;">
+                            <input type="text" id="editCustomUslugaNazwa" placeholder="Nazwa usługi" style="flex: 1; min-width: 150px;">
+                            <input type="number" id="editCustomUslugaIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
+                            <input type="number" id="editCustomUslugaCena" placeholder="Cena" step="0.01" style="width: 120px;">
+                            <button type="button" class="btn btn-primary" onclick="addCustomUslugaToEditCost()">+ Dodaj własną</button>
+                        </div>
+                    </details>
+                    
+                    <div id="editSelectedUslugi"></div>
+                </div>
+
+                <!-- PODSUMOWANIE NOWEGO KOSZTORYSU -->
+                <div id="editNewCostSummary" style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-top: 20px; display: none;">
+                    <h5>💵 Podsumowanie nowego kosztorysu</h5>
+                    <div id="editCostTotal" style="font-size: 1.2em; font-weight: bold; color: #28a745;"></div>
+                    <button type="button" class="btn btn-success" onclick="saveNewCostEstimate()">💾 Zapisz kosztorys</button>
+                </div>
+            </div>
+
+            <!-- PRZYCISKI AKCJI -->
             <div style="display: flex; gap: 15px; justify-content: center; margin-top: 25px;">
-                <button type="submit" class="btn btn-primary">💾 Zapisz zmiany</button>
+                <button type="submit" class="btn btn-primary">💾 Zapisz zmiany notatki</button>
                 <button type="button" class="btn btn-secondary" onclick="closeEditModal()">❌ Anuluj</button>
             </div>
         </form>
     </div>
 </div>
+
+<style>
+/* Style dla rozbudowanego modala edycji */
+#editModal .modal-content {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from { transform: translateY(-50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+#editModal .card {
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#editModal .card h4, #editModal .card h5 {
+    margin-top: 0;
+    color: #495057;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 8px;
+}
+
+#editModal .form-group {
+    margin-bottom: 15px;
+}
+
+#editModal .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #495057;
+}
+
+#editModal input, #editModal select, #editModal textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+#editModal input:focus, #editModal select:focus, #editModal textarea:focus {
+    outline: none;
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+}
+
+.edit-cost-item {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.edit-cost-item .item-info {
+    flex: 1;
+}
+
+.edit-cost-item .item-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.edit-existing-cost {
+    background: #e3f2fd;
+    border: 1px solid #2196f3;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.edit-existing-cost h5 {
+    margin: 0 0 10px 0;
+    color: #1976d2;
+}
+
+.edit-existing-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Responsywność */
+@media (max-width: 768px) {
+    #editModal .modal-content {
+        width: 98%;
+        margin: 1% auto;
+    }
+    
+    #editModal .card {
+        padding: 15px;
+    }
+    
+    #editModal input, #editModal select {
+        margin-bottom: 10px;
+    }
+    
+    .edit-cost-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .edit-existing-actions {
+        flex-direction: column;
+    }
+}
+</style>

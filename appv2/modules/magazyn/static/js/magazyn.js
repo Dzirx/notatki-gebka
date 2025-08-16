@@ -1,11 +1,7 @@
 // === MAGAZYN.JS - LOGIKA MODUŁU MAGAZYN ===
 
-console.log('📦 Moduł magazyn załadowany');
-
 // Inicjalizacja po załadowaniu DOM
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Magazyn gotowy');
-    
     // Ustaw dzisiejszą datę jako domyślną (dla terminarza)
     const dateInput = document.getElementById('selected_date');
     if (dateInput && !dateInput.value) {
@@ -14,29 +10,149 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Obsługa przycisku "🔄 Odśwież"
-    const refreshZleceniaBtn = document.getElementById('refresh-zlecenia-btn'); // zlecenia
-
+    const refreshZleceniaBtn = document.getElementById('refresh-zlecenia-btn');
     if (refreshZleceniaBtn) {
         refreshZleceniaBtn.addEventListener('click', odswiez);
     }
+
+    // Obsługa checkboxa "Tylko towar" w terminarzu
+    initTowarFilter();
 });
+
+// Inicjalizacja filtra towarów
+function initTowarFilter() {
+    const towarCheckbox = document.getElementById('tylko_towar');
+    if (!towarCheckbox) return;
+
+    // USUŃ automatyczną zmianę widoku przy zmianie checkboxa
+    // Widok zmieni się dopiero po submit formularza
+    
+    // Opcjonalnie: zastosuj widok towarów tylko jeśli checkbox jest zaznaczony 
+    // I są już wyświetlone wyniki (po submit)
+    const hasResults = document.querySelector('#terminarz .results-container .table-responsive');
+    if (towarCheckbox.checked && hasResults) {
+        toggleTowarView(true);
+    }
+}
+
+// Przełącza widok towarów (ukrywa/pokazuje elementy)
+function toggleTowarView(isTowarMode) {
+    if (isTowarMode) {
+        // Tryb towarów - pokazuj tylko zawartość towarów w szczegółach
+        const vehicleDetails = document.querySelectorAll('.pojazd-details-content');
+        vehicleDetails.forEach(content => {
+            // Ukryj sekcje opon
+            const oponyElements = content.querySelectorAll('.depozyt-section, .opony-table-details, .depozyt-opony-section, h4:not(:has(+ .depozyt-info))');
+            oponyElements.forEach(el => {
+                if (!el.textContent.includes('Towary') && !el.textContent.includes('Usługi')) {
+                    el.style.display = 'none';
+                }
+            });
+            
+            // Pokaż tylko sekcje z towarami/usługami
+            const towarElements = content.querySelectorAll('.depozyt-info');
+            towarElements.forEach(el => el.style.display = 'block');
+        });
+        
+        // Ukryj kolumny z oponami w tabeli głównej
+        hideOponyColumns(true);
+    } else {
+        // Tryb normalny - pokaż wszystko
+        const vehicleDetails = document.querySelectorAll('.pojazd-details-content');
+        vehicleDetails.forEach(content => {
+            const allElements = content.querySelectorAll('*');
+            allElements.forEach(el => el.style.display = '');
+        });
+        
+        // Pokaż kolumny z oponami w tabeli głównej
+        hideOponyColumns(false);
+    }
+}
+
+// Ukryj/pokaż kolumny z informacjami o oponach w głównej tabeli
+function hideOponyColumns(hide) {
+    const terminarzeTable = document.querySelector('#terminarz .opony-table');
+    if (!terminarzeTable) return;
+    
+    // Znajdź wiersze pojazdów (nie szczegóły)
+    const vehicleRows = terminarzeTable.querySelectorAll('tr.vehicle-header');
+    
+    vehicleRows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 3) {
+            // Kolumna "Felgi/Opony" (index 1)
+            const oponyCell = cells[1];
+            // Kolumna "Lokalizacja" (index 2)  
+            const lokalizacjaCell = cells[2];
+            
+            if (hide) {
+                // Zachowaj oryginalne wartości w data-atrybutach
+                if (!oponyCell.hasAttribute('data-original')) {
+                    oponyCell.setAttribute('data-original', oponyCell.innerHTML);
+                    lokalizacjaCell.setAttribute('data-original', lokalizacjaCell.innerHTML);
+                }
+                
+                oponyCell.innerHTML = '<div style="font-size: 0.9em; color: #6c757d;">📦 Towar</div>';
+                lokalizacjaCell.innerHTML = '<span style="color: #6c757d;">-</span>';
+            } else {
+                // Przywróć oryginalne wartości
+                if (oponyCell.hasAttribute('data-original')) {
+                    oponyCell.innerHTML = oponyCell.getAttribute('data-original');
+                    lokalizacjaCell.innerHTML = lokalizacjaCell.getAttribute('data-original');
+                    // Usuń atrybuty po przywróceniu
+                    oponyCell.removeAttribute('data-original');
+                    lokalizacjaCell.removeAttribute('data-original');
+                }
+            }
+        }
+    });
+}
 
 // Proste odświeżenie widoku (backend zwróci aktualne dane "na dziś")
 function odswiez() {
-    console.log('🔄 Odświeżanie widoku (GET bez ponawiania POST)');
-    window.location.replace(window.location.pathname); // czysty GET na /
+    window.location.replace(window.location.pathname);
 }
 
-// FUNKCJA ROZWIJANIA POJAZDÓW (w terminarzu)
+// FUNKCJA ROZWIJANIA POJAZDÓW
 function togglePojazd(rej) {
     const detailsRow = document.querySelector(`.pojazd-details[data-rej="${rej}"]`);
     if (!detailsRow) return;
-    detailsRow.style.display = (detailsRow.style.display === 'none' || !detailsRow.style.display)
-        ? 'table-row'
-        : 'none';
+    
+    const isVisible = detailsRow.style.display === 'table-row';
+    detailsRow.style.display = isVisible ? 'none' : 'table-row';
+    
+    // Sprawdź czy tryb towar jest aktywny i zastosuj filtrowanie
+    const towarCheckbox = document.getElementById('tylko_towar');
+    if (towarCheckbox && towarCheckbox.checked && !isVisible) {
+        setTimeout(() => {
+            applyTowarFilterToRow(detailsRow);
+        }, 0);
+    }
 }
 
-// FUNKCJA ZAKŁADEK (bez użycia event.target)
+// Funkcja pomocnicza do filtrowania pojedynczego wiersza szczegółów
+function applyTowarFilterToRow(detailsRow) {
+    const content = detailsRow.querySelector('.pojazd-details-content');
+    if (!content) return;
+    
+    // Ukryj wszystkie sekcje depozytów/opon
+    const oponyElements = content.querySelectorAll('.depozyt-section, .opony-table-details, .depozyt-opony-section, h4, h5, table');
+    oponyElements.forEach(el => {
+        // Sprawdź czy element zawiera informacje o towarach/usługach
+        const text = el.textContent;
+        if (text.includes('Towary') || text.includes('Usługi') || el.classList.contains('depozyt-info')) {
+            el.style.display = 'block';
+        } else {
+            el.style.display = 'none';
+        }
+    });
+    
+    // Pokaż tylko sekcje z towarami/usługami
+    const towarElements = content.querySelectorAll('.depozyt-info');
+    towarElements.forEach(el => el.style.display = 'block');
+}
+
+// FUNKCJA ZAKŁADEK
 function switchTab(btnEl, tabName) {
     // przełącz treść
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
@@ -68,12 +184,17 @@ function formatPolishDate(dateString) {
     });
 }
 
-// EXPORT FUNKCJI
+// EXPORT FUNKCJI - dodaj togglePojazd do globalnego scope
+window.togglePojazd = togglePojazd;
+window.switchTab = switchTab;
+
 window.MagazynUtils = {
     formatPolishDate,
     switchTab,
     togglePojazd,
-    getBieznikClass
+    getBieznikClass,
+    initTowarFilter,
+    toggleTowarView
 };
 
 // Akcje (np. do wywołania z konsoli/devtools)

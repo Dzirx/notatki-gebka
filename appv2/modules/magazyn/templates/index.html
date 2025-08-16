@@ -56,23 +56,74 @@
                             <thead>
                                 <tr>
                                     <th>Nr Rejestracyjny</th>
-                                    <th>Opony do wydania</th>
+                                    <th>Do wydania</th>
                                     <th>Lokalizacje</th>
-                                    <th>Notatka</th>
+                                    <th>Notatka zlecenia</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for pojazd in pojazdy_zlecenia_grouped %}
                                 <tr class="vehicle-header" onclick="togglePojazd('zlecenie_{{ pojazd.rej }}')" style="cursor: pointer;">
                                     <td><strong>{{ pojazd.rej }}</strong></td>
-                                    <td>{{ pojazd.opony_count }} opon</td>
-                                    <td>{{ pojazd.lokalizacje_summary }}</td>
+                                    <td>
+                                        {% if pojazd.ma_tylko_towary %}
+                                            <div class="status-icons" style="font-size: 0.9em; color: #6c757d; line-height: 1.4;">
+                                                {% if pojazd.towary_szczegoly and pojazd.towary_szczegoly.strip() %}
+                                                    📦 Towary<br>
+                                                {% endif %}
+                                                {% if pojazd.uslugi_szczegoly and pojazd.uslugi_szczegoly.strip() %}
+                                                    🛠️ Usługi
+                                                {% endif %}
+                                                {% if not pojazd.towary_szczegoly and not pojazd.uslugi_szczegoly %}
+                                                    <span style="color: #999;">Brak pozycji</span>
+                                                {% endif %}
+                                            </div>
+                                        {% else %}
+                                            <div class="status-icons" style="font-size: 0.9em; color: #6c757d; line-height: 1.4;">
+                                                {% for depozyt in pojazd.depozyty %}
+                                                    🔧 {{ depozyt.numer_depozytu }}<br>
+                                                {% endfor %}
+                                                {% if pojazd.towary_szczegoly and pojazd.towary_szczegoly.strip() %}
+                                                    📦 Towary<br>
+                                                {% endif %}
+                                                {% if pojazd.uslugi_szczegoly and pojazd.uslugi_szczegoly.strip() %}
+                                                    🛠️ Usługi
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if pojazd.ma_tylko_towary %}
+                                            <span style="color: #6c757d;">-</span>
+                                        {% else %}
+                                            <div style="font-size: 0.9em;">
+                                                {{ pojazd.lokalizacje_summary|replace(' / ', '<br>')|safe }}
+                                            </div>
+                                        {% endif %}
+                                    </td>
                                     <td>{{ pojazd.notatka or "-" }}</td>
                                 </tr>
                                 
                                 <tr class="pojazd-details" data-rej="zlecenie_{{ pojazd.rej }}" style="display: none;">
                                     <td colspan="4">
                                         <div class="pojazd-details-content">
+                                            
+                                            {% if pojazd.ma_tylko_towary %}
+                                            <!-- ZLECENIE TYLKO Z TOWARAMI -->
+                                            <h4>
+                                                {% if pojazd.towary_szczegoly and pojazd.uslugi_szczegoly %}
+                                                    📦🔧 Zlecenie - towary i usługi
+                                                {% elif pojazd.towary_szczegoly %}
+                                                    📦 Zlecenie - tylko towary
+                                                {% elif pojazd.uslugi_szczegoly %}
+                                                    🔧 Zlecenie - tylko usługi
+                                                {% else %}
+                                                    ❓ Zlecenie bez pozycji
+                                                {% endif %}
+                                            </h4>
+                                            
+                                            {% else %}
+                                            <!-- ZLECENIE Z OPONAMI -->
                                             <h4>🔍 Szczegóły opon do wydania</h4>
                                             
                                             {% for depozyt in pojazd.depozyty %}
@@ -88,7 +139,6 @@
                                                             <th>Bieżnik</th>
                                                             <th>Lokalizacja</th>
                                                             <th>Opis wymiany</th>
-                                                            <th>Uwagi</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -106,25 +156,33 @@
                                                             <td>{{ opona.bieznik }}mm</td>
                                                             <td><code>{{ opona.lokalizacja or "-" }}</code></td>
                                                             <td>{{ opona.opisOponyKPO or "-" }}</td>
-                                                            <td>{{ opona.kartaprzechowywalniuwagi or "-" }}</td>
                                                         </tr>
                                                         {% endfor %}
                                                     </tbody>
                                                 </table>
+                                                
+                                                <!-- UWAGI DEPOZYTU POD TABELĄ -->
+                                                {% if depozyt.kartaprzechowywalniuwagi and depozyt.kartaprzechowywalniuwagi != "-" %}
+                                                <div class="depozyt-uwagi" style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                                                    <strong>Uwagi depozytu:</strong><br>
+                                                    {{ depozyt.kartaprzechowywalniuwagi }}
+                                                </div>
+                                                {% endif %}
                                             </div>
                                             {% endfor %}
+                                            {% endif %}
 
                                             {% if pojazd.towary_szczegoly %}
                                             <div class="depozyt-info" style="margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
                                                 <p><strong>📦 Towary do wydania:</strong></p>
-                                                <p>{{ pojazd.towary_szczegoly }}</p>
+                                                <p>{{ pojazd.towary_szczegoly|replace(', ', '<br>')|safe }}</p>
                                             </div>
                                             {% endif %}
 
                                             {% if pojazd.uslugi_szczegoly %}
                                             <div class="depozyt-info" style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
                                                 <p><strong>🔧 Usługi:</strong></p>
-                                                <p>{{ pojazd.uslugi_szczegoly }}</p>
+                                                <p>{{ pojazd.uslugi_szczegoly|replace(', ', '<br>')|safe }}</p>
                                             </div>
                                             {% endif %}
                                         </div>
@@ -148,14 +206,19 @@
             <div id="terminarz" class="tab-content {% if active_tab == 'terminarz' %}active{% endif %}">
                 <h3>🗓️ Terminarz - Harmonogram</h3>
                 
-                <!-- FORMULARZ WYSZUKIWANIA -->
+                <!-- FORMULARZ WYSZUKIWANIA Z FILTREM TOWAR -->
                 <div class="search-form-container" style="background: none; box-shadow: none; margin-bottom: 20px;">
-                    <form method="post" class="date-search-form">
+                    <form method="post" class="date-search-form" style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
                         <input type="hidden" name="tab" value="terminarz">
-                        <div class="form-group">
+                        <div class="form-group" style="margin: 0;">
                             <label for="selected_date">Data:</label>
                             <input type="date" id="selected_date" name="selected_date" 
                                    value="{{ selected_date or dzisiejsza_data }}" required>
+                        </div>
+                        <div class="form-group" style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="tylko_towar" name="tylko_towar" value="1" 
+                                   {% if tylko_towar %}checked{% endif %}>
+                            <label for="tylko_towar" style="margin: 0; cursor: pointer;">📦 Towar</label>
                         </div>
                         <button type="submit" class="btn-primary">🔍 Pokaż harmonogram</button>
                     </form>
@@ -164,7 +227,7 @@
                 <!-- WYNIKI TERMINARZ -->
                 {% if selected_date and active_tab == 'terminarz' %}
                 <div class="results-container" style="box-shadow: none; background: none; padding: 0;">
-                    <h4>🗓️ Harmonogram na: {{ selected_date }}</h4>
+                    <h4>🗓️ Harmonogram na: {{ selected_date }}{% if tylko_towar %} (tylko towary){% endif %}</h4>
                     
                     {% if pojazdy_grouped %}
                     <div class="table-responsive">
@@ -181,59 +244,105 @@
                                 {% for pojazd in pojazdy_grouped %}
                                 <tr class="vehicle-header" onclick="togglePojazd('{{ pojazd.rej }}')" style="cursor: pointer;">
                                     <td><strong>{{ pojazd.rej }}</strong></td>
-                                    <td>{{ pojazd.wheels_summary }}</td>
-                                    <td>{{ pojazd.lokalizacje_summary }}</td>
-                                    <td>{{ pojazd.uwagi_summary }}</td>
+                                    <td>
+                                        {% if tylko_towar %}
+                                            <div style="font-size: 0.9em; color: #6c757d;">
+                                                📦 Towar
+                                            </div>
+                                        {% else %}
+                                            {{ pojazd.wheels_summary|replace(' / ', '<br>')|safe }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if tylko_towar %}
+                                            <span style="color: #6c757d;">-</span>
+                                        {% else %}
+                                            {{ pojazd.lokalizacje_summary|replace(' / ', '<br>')|safe }}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ pojazd.uwagi_summary|replace(' / ', '<br>')|safe }}</td>
                                 </tr>
                                 
                                 <tr class="pojazd-details" data-rej="{{ pojazd.rej }}" style="display: none;">
                                     <td colspan="4">
-                                        {% for depozyt in pojazd.depozyty %}
-                                        <h4>📦 Depozyt: {{ depozyt.numer_depozytu }}</h4>
-                                        
-                                        <table class="opony-table-details">
-                                            <thead>
-                                                <tr>
-                                                    <th>Nazwa opony</th>
-                                                    <th>Lokalizacja</th>
-                                                    <th>Rodzaj</th>
-                                                    <th>Typ</th>
-                                                    <th>Bieżnik</th>
-                                                    <th>Uwagi</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {% for opona in depozyt.opony %}
-                                                <tr>
-                                                    <td>{{ opona.name }}</td>
-                                                    <td>{{ opona.lokalizacja }}</td>
-                                                    <td>{{ opona.wheels }}</td>
-                                                    <td>{{ opona.rodzaj_opony }}</td>
-                                                    <td>{{ opona.bieznik }}mm</td>
-                                                    <td>{{ opona.opona_uwagi or "-" }}</td>
-                                                </tr>
+                                        {% if tylko_towar %}
+                                        <!-- WIDOK TYLKO TOWARY -->
+                                        <div class="pojazd-details-content">
+                                            <h4>📦 Towary do wydania</h4>
+                                            
+                                            {% set all_towary = [] %}
+                                            {% set all_uslugi = [] %}
+                                            
+                                            {% for depozyt in pojazd.depozyty %}
+                                                {% if depozyt.towary_szczegoly %}
+                                                    {% if depozyt.towary_szczegoly not in all_towary %}
+                                                        {% set _ = all_towary.append(depozyt.towary_szczegoly) %}
+                                                    {% endif %}
+                                                {% endif %}
+                                                {% if depozyt.uslugi_szczegoly %}
+                                                    {% if depozyt.uslugi_szczegoly not in all_uslugi %}
+                                                        {% set _ = all_uslugi.append(depozyt.uslugi_szczegoly) %}
+                                                    {% endif %}
+                                                {% endif %}
+                                            {% endfor %}
+                                            
+                                            {% if all_towary %}
+                                            <div class="depozyt-info" style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                                                <p><strong>📦 Towary:</strong></p>
+                                                {% for towar in all_towary %}
+                                                <p>{{ towar|replace(', ', '<br>')|safe }}</p>
                                                 {% endfor %}
-                                            </tbody>
-                                        </table>
-
-                                        <div class="depozyt-info">
-                                            <p><strong>Uwagi depozytu:</strong> {{ depozyt.karta_uwagi or "Brak uwag" }}</p>
+                                            </div>
+                                            {% endif %}
+                                            
+                                            {% if all_uslugi %}
+                                            <div class="depozyt-info" style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-radius: 5px;">
+                                                <p><strong>🔧 Usługi:</strong></p>
+                                                {% for usluga in all_uslugi %}
+                                                <p>{{ usluga|replace(', ', '<br>')|safe }}</p>
+                                                {% endfor %}
+                                            </div>
+                                            {% endif %}
                                         </div>
+                                        
+                                        {% else %}
+                                        <!-- WIDOK STANDARDOWY - TYLKO OPONY -->
+                                        {% for depozyt in pojazd.depozyty %}
+                                        <div class="depozyt-opony-section">
+                                            <h4>📦 Depozyt: {{ depozyt.numer_depozytu }}</h4>
+                                            
+                                            <table class="opony-table-details">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Nazwa opony</th>
+                                                        <th>Lokalizacja</th>
+                                                        <th>Rodzaj</th>
+                                                        <th>Typ</th>
+                                                        <th>Bieżnik</th>
+                                                        <th>Uwagi</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for opona in depozyt.opony %}
+                                                    <tr>
+                                                        <td>{{ opona.name }}</td>
+                                                        <td>{{ opona.lokalizacja }}</td>
+                                                        <td>{{ opona.wheels }}</td>
+                                                        <td>{{ opona.rodzaj_opony }}</td>
+                                                        <td>{{ opona.bieznik }}mm</td>
+                                                        <td>{{ opona.opona_uwagi or "-" }}</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
 
-                                        {% if depozyt.towary_szczegoly %}
-                                        <div class="depozyt-info">
-                                            <p><strong>📦 Towary:</strong></p>
-                                            <p>{{ depozyt.towary_szczegoly }}</p>
+                                            <div class="depozyt-info">
+                                                <p><strong>Uwagi depozytu:</strong> {{ depozyt.karta_uwagi or "Brak uwag" }}</p>
+                                            </div>
                                         </div>
-                                        {% endif %}
-
-                                        {% if depozyt.uslugi_szczegoly %}
-                                        <div class="depozyt-info">
-                                            <p><strong>🔧 Usługi:</strong></p>
-                                            <p>{{ depozyt.uslugi_szczegoly }}</p>
-                                        </div>
-                                        {% endif %}
                                         {% endfor %}
+                                        <p><strong>Uwagi do terminarza:</strong> {{ pojazd.opis_terminarza if pojazd.opis_terminarza else "Brak uwag" }}</p>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -243,8 +352,8 @@
                     
                     {% else %}
                     <div class="no-results">
-                        <p>❌ Brak pojazdów na: <strong>{{ selected_date }}</strong></p>
-                        <p>Spróbuj wybrać inną datę.</p>
+                        <p>❌ Brak pojazdów na: <strong>{{ selected_date }}</strong>{% if tylko_towar %} z towarami{% endif %}</p>
+                        <p>Spróbuj wybrać inną datę{% if tylko_towar %} lub odznacz filtr "Towar"{% endif %}.</p>
                     </div>
                     {% endif %}
                 </div>
@@ -255,13 +364,5 @@
 
     <script src="/static/js/common.js"></script>
     <script src="/modules/magazyn/static/js/magazyn.js"></script>
-    <script>
-        function togglePojazd(rejId) {
-            const details = document.querySelector(`[data-rej="${rejId}"]`);
-            if (details) {
-                details.style.display = details.style.display === 'none' ? 'table-row' : 'none';
-            }
-        }
-    </script>
 </body>
 </html>

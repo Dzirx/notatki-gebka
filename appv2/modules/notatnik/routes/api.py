@@ -289,3 +289,200 @@ async def sync_towary_z_integra(
     except Exception as e:
         print(f"❌ Błąd synchronizacji: {e}")
         raise HTTPException(status_code=500, detail=f"Błąd synchronizacji: {str(e)}")
+    
+# === DODAJ TE ENDPOINTY DO modules/notatnik/routes/api.py ===
+
+@router.get("/kosztorysy-notatki/{notatka_id}")
+def get_kosztorysy_notatki(notatka_id: int, db: Session = Depends(get_db)):
+    """Pobiera wszystkie kosztorysy dla notatki z towarami i usługami"""
+    try:
+        kosztorysy = crud.get_kosztorysy_z_towarami_dla_notatki(db, notatka_id)
+        return {"kosztorysy": kosztorysy}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Błąd pobierania kosztorysów: {str(e)}")
+
+@router.post("/kosztorys")
+async def create_kosztorys_api(request: Request, db: Session = Depends(get_db)):
+    """Tworzy nowy kosztorys z towarami i usługami"""
+    try:
+        data = await request.json()
+        
+        # Walidacja danych
+        notatka_id = data.get("notatka_id")
+        numer_kosztorysu = data.get("numer_kosztorysu")
+        opis = data.get("opis", "")
+        towary = data.get("towary", [])
+        uslugi = data.get("uslugi", [])
+        
+        if not notatka_id:
+            raise HTTPException(status_code=400, detail="Brak ID notatki")
+        if not numer_kosztorysu:
+            raise HTTPException(status_code=400, detail="Brak numeru kosztorysu")
+        if len(towary) == 0 and len(uslugi) == 0:
+            raise HTTPException(status_code=400, detail="Dodaj przynajmniej jeden towar lub usługę")
+        
+        # Oblicz kwotę całkowitą
+        kwota_calkowita = 0.0
+        for towar in towary:
+            kwota_calkowita += float(towar.get('ilosc', 0)) * float(towar.get('cena', 0))
+        for usluga in uslugi:
+            kwota_calkowita += float(usluga.get('ilosc', 0)) * float(usluga.get('cena', 0))
+        
+        # Utwórz kosztorys
+        kosztorys = crud.create_kosztorys(
+            db=db,
+            notatka_id=notatka_id,
+            kwota=kwota_calkowita,
+            opis=opis,
+            numer_kosztorysu=numer_kosztorysu
+        )
+        
+        # Dodaj towary
+        for towar_data in towary:
+            if towar_data.get('isCustom'):
+                # Własny towar - utwórz nowy
+                custom_towar = crud.create_custom_towar(
+                    db, 
+                    towar_data['nazwa'], 
+                    towar_data['cena']
+                )
+                crud.add_towar_do_kosztorysu(
+                    db=db,
+                    kosztorys_id=kosztorys.id,
+                    towar_id=custom_towar.id,
+                    ilosc=towar_data['ilosc'],
+                    cena=towar_data['cena']
+                )
+            else:
+                # Istniejący towar
+                crud.add_towar_do_kosztorysu(
+                    db=db,
+                    kosztorys_id=kosztorys.id,
+                    towar_id=towar_data['id'],
+                    ilosc=towar_data['ilosc'],
+                    cena=towar_data['cena']
+                )
+        
+        # Dodaj usługi
+        for usluga_data in uslugi:
+            if usluga_data.get('isCustom'):
+                # Własna usługa - utwórz nową
+                custom_usluga = crud.create_custom_usluga(
+                    db, 
+                    usluga_data['nazwa'], 
+                    usluga_data['cena']
+                )
+                crud.add_usluge_do_kosztorysu(
+                    db=db,
+                    kosztorys_id=kosztorys.id,
+                    usluga_id=custom_usluga.id,
+                    ilosc=usluga_data['ilosc'],
+                    cena=usluga_data['cena']
+                )
+            else:
+                # Istniejąca usługa
+                crud.add_usluge_do_kosztorysu(
+                    db=db,
+                    kosztorys_id=kosztorys.id,
+                    usluga_id=usluga_data['id'],
+                    ilosc=usluga_data['ilosc'],
+                    cena=usluga_data['cena']
+                )
+        
+        return {
+            "success": True,
+            "kosztorys_id": kosztorys.id,
+            "message": f"Kosztorys {numer_kosztorysu} został utworzony"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Błąd tworzenia kosztorysu: {str(e)}")
+
+@router.delete("/kosztorys/{kosztorys_id}")
+def delete_kosztorys_api(kosztorys_id: int, db: Session = Depends(get_db)):
+    """Usuwa kosztorys"""
+    try:
+        success = crud.delete_kosztorys(db, kosztorys_id)
+        if success:
+            return {"success": True, "message": "Kosztorys został usunięty"}
+        else:
+            raise HTTPException(status_code=404, detail="Kosztorys nie znaleziony")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Błąd usuwania kosztorysu: {str(e)}")
+
+@router.get("/notatka-szczegoly/{notatka_id}")
+def get_notatka_szczegoly(notatka_id: int, db: Session = Depends(get_db)):
+    """Pobiera szczegółowe dane notatki z samochodem i klientem"""
+    try:
+        notatka = crud.get_notatka_szczegoly(db, notatka_id)
+        if not notatka:
+            raise HTTPException(status_code=404, detail="Notatka nie znaleziona")
+        
+        result = {
+            "id": notatka.id,
+            "tresc": notatka.tresc,
+            "typ_notatki": notatka.typ_notatki,
+            "created_at": notatka.created_at.isoformat(),
+            "samochod": None
+        }
+        
+        if notatka.samochod:
+            result["samochod"] = {
+                "id": notatka.samochod.id,
+                "nr_rejestracyjny": notatka.samochod.nr_rejestracyjny,
+                "marka": notatka.samochod.marka,
+                "model": notatka.samochod.model,
+                "rok_produkcji": notatka.samochod.rok_produkcji,
+                "klient": {
+                    "id": notatka.samochod.klient.id,
+                    "nazwapelna": notatka.samochod.klient.nazwapelna,
+                    "nr_telefonu": notatka.samochod.klient.nr_telefonu
+                } if notatka.samochod.klient else None
+            }
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Błąd pobierania szczegółów: {str(e)}")
+    
+@router.put("/notatka/{notatka_id}/status")
+async def update_notatka_status(notatka_id: int, request: Request, db: Session = Depends(get_db)):
+    """Aktualizacja statusu notatki (AJAX)"""
+    try:
+        data = await request.json()
+        new_status = data.get("status")
+        
+        # Walidacja statusu
+        allowed_statuses = ['nowa', 'w_trakcie', 'zakonczona', 'anulowana', 'oczekuje']
+        if new_status not in allowed_statuses:
+            raise HTTPException(status_code=400, detail="Nieprawidłowy status")
+        
+        # Znajdź notatkę
+        notatka = crud.get_notatka_by_id(db, notatka_id)
+        if not notatka:
+            raise HTTPException(status_code=404, detail="Notatka nie znaleziona")
+        
+        # Aktualizuj status
+        notatka.status = new_status
+        db.commit()
+        db.refresh(notatka)
+        
+        return {
+            "success": True,
+            "message": f"Status zmieniony na '{new_status}'",
+            "new_status": new_status,
+            "notatka_id": notatka_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Błąd aktualizacji statusu: {str(e)}")

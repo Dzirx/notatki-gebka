@@ -1,6 +1,6 @@
 # === MODULES/NOTATNIK/CRUD.PY - OPERACJE BAZODANOWE ===
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import text
+from sqlalchemy import text, func
 from models import Notatka, Samochod, Kosztorys, KosztorysTowar, KosztorysUsluga, Towar, Usluga, Klient
 from typing import List, Dict, Any
 
@@ -14,7 +14,7 @@ def get_wszystkie_notatki(db: Session, skip: int = 0, limit: int = 100):
 
 def create_notatka_szybka(db: Session, tresc: str):
     """Tworzy notatkę ogólną (szybką) - nie przypisaną do konkretnego samochodu"""
-    db_notatka = Notatka(samochod_id=None, typ_notatki="szybka", tresc=tresc)
+    db_notatka = Notatka(samochod_id=None, typ_notatki="szybka", tresc=tresc, status="nowa")
     db.add(db_notatka)
     db.commit()
     db.refresh(db_notatka)
@@ -22,7 +22,7 @@ def create_notatka_szybka(db: Session, tresc: str):
 
 def create_notatka_samochod(db: Session, samochod_id: int, tresc: str):
     """Tworzy notatkę przypisaną do konkretnego samochodu"""
-    db_notatka = Notatka(samochod_id=samochod_id, typ_notatki="pojazd", tresc=tresc)
+    db_notatka = Notatka(samochod_id=samochod_id, typ_notatki="pojazd", tresc=tresc, status="nowa")
     db.add(db_notatka)
     db.commit()
     db.refresh(db_notatka)
@@ -371,3 +371,93 @@ def get_or_create_usluga_by_id(db: Session, usluga_id: int, nazwa: str, cena: fl
             print(f"🔄 Zaktualizowano cenę usługi: {nazwa} (ID: {usluga_id})")
     
     return usluga
+
+# === DODAJ TE FUNKCJE DO modules/notatnik/crud.py ===
+
+def get_notatka_szczegoly(db: Session, notatka_id: int):
+    """Pobiera notatkę z pełnymi danymi samochodu i klienta"""
+    return db.query(Notatka).options(
+        joinedload(Notatka.samochod).joinedload(Samochod.klient)
+    ).filter(Notatka.id == notatka_id).first()
+
+def create_custom_towar(db: Session, nazwa: str, cena: float):
+    """Tworzy własny towar (nie z bazy integra)"""
+    from models import Towar
+    
+    # Sprawdź czy towar o tej nazwie już istnieje
+    existing = db.query(Towar).filter(Towar.nazwa == nazwa).first()
+    if existing:
+        return existing
+    
+    towar = Towar(
+        nazwa=nazwa,
+        cena=cena
+    )
+    db.add(towar)
+    db.commit()
+    db.refresh(towar)
+    return towar
+
+def create_custom_usluga(db: Session, nazwa: str, cena: float):
+    """Tworzy własną usługę (nie z bazy integra)"""
+    from models import Usluga
+    
+    # Sprawdź czy usługa o tej nazwie już istnieje
+    existing = db.query(Usluga).filter(Usluga.nazwa == nazwa).first()
+    if existing:
+        return existing
+    
+    usluga = Usluga(
+        nazwa=nazwa,
+        cena=cena
+    )
+    db.add(usluga)
+    db.commit()
+    db.refresh(usluga)
+    return usluga
+
+def delete_kosztorys(db: Session, kosztorys_id: int):
+    """Usuwa kosztorys wraz z wszystkimi pozycjami"""
+    try:
+        # Usuń pozycje kosztorysu
+        db.query(KosztorysTowar).filter(KosztorysTowar.kosztorys_id == kosztorys_id).delete()
+        db.query(KosztorysUsluga).filter(KosztorysUsluga.kosztorys_id == kosztorys_id).delete()
+        
+        # Usuń kosztorys
+        kosztorys = db.query(Kosztorys).filter(Kosztorys.id == kosztorys_id).first()
+        if kosztorys:
+            db.delete(kosztorys)
+            db.commit()
+            return True
+        return False
+    except Exception as e:
+        db.rollback()
+        print(f"Błąd usuwania kosztorysu {kosztorys_id}: {e}")
+        return False
+
+def update_notatka_status(db: Session, notatka_id: int, new_status: str):
+    """Aktualizuje status notatki"""
+    try:
+        # Znajdź notatkę
+        notatka = db.query(Notatka).filter(Notatka.id == notatka_id).first()
+        
+        if not notatka:
+            return None
+        
+        # Walidacja statusu
+        allowed_statuses = ['nowa', 'w_trakcie', 'zakonczona', 'anulowana', 'oczekuje']
+        if new_status not in allowed_statuses:
+            raise ValueError(f"Nieprawidłowy status: {new_status}")
+        
+        # Aktualizuj status
+        notatka.status = new_status
+        notatka.updated_at = datetime.utcnow()  # Jeśli masz pole updated_at
+        
+        db.commit()
+        db.refresh(notatka)
+        
+        return notatka
+        
+    except Exception as e:
+        db.rollback()
+        raise e

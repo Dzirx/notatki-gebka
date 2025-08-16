@@ -270,4 +270,188 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
+// OBSŁUGA STATUSÓW
+function showStatusMenu(noteId, badgeElement) {
+    // Ukryj wszystkie inne menu
+    document.querySelectorAll('.status-menu').forEach(menu => {
+        if (menu.id !== `statusMenu${noteId}`) {
+            menu.style.display = 'none';
+            menu.classList.remove('show', 'menu-up');
+        }
+    });
+    
+    const menu = document.getElementById(`statusMenu${noteId}`);
+    if (menu.style.display === 'none') {
+        // Reset klasy pozycjonowania
+        menu.classList.remove('menu-up');
+        
+        // Pokaż menu
+        menu.style.display = 'block';
+        
+        // Sprawdź czy menu wychodzi poza dolną krawędź ekranu
+        const rect = menu.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        
+        if (rect.bottom > viewportHeight - 10) {
+            menu.classList.add('menu-up');
+        }
+        
+        // Animacja pojawiania
+        setTimeout(() => menu.classList.add('show'), 10);
+    } else {
+        menu.classList.remove('show');
+        setTimeout(() => {
+            menu.style.display = 'none';
+            menu.classList.remove('menu-up');
+        }, 200);
+    }
+}
+
+// Nowa funkcja używająca data-atrybutów
+function selectStatusFromMenu(noteId, optionElement) {
+    const status = optionElement.dataset.status;
+    const statusText = optionElement.dataset.text;
+    
+    // Mapa emoji dla statusów
+    const statusEmojis = {
+        'nowa': '🔵',
+        'w_trakcie': '🟡',
+        'zakonczona': '🟢',
+        'anulowana': '🔴',
+        'oczekuje': '🟠'
+    };
+    
+    const fullStatusText = `${statusEmojis[status]} ${statusText}`;
+    selectStatus(noteId, status, fullStatusText);
+}
+
+async function selectStatus(noteId, status, statusText) {
+    // Znajdź badge i menu - poprawiony selektor
+    const badge = document.querySelector(`[onclick*="showStatusMenu(${noteId}"]`);
+    const menu = document.getElementById(`statusMenu${noteId}`);
+    
+    // Sprawdź czy elementy zostały znalezione
+    if (!badge) {
+        console.error(`❌ Nie znaleziono badge dla notatki ${noteId}`);
+        return;
+    }
+    
+    if (!menu) {
+        console.error(`❌ Nie znaleziono menu dla notatki ${noteId}`);
+        return;
+    }
+    
+    try {
+        // Wyślij request do API
+        const response = await fetch(`/api/notatka/${noteId}/status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ status: status })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.detail || 'Błąd aktualizacji statusu');
+        }
+
+        // Aktualizuj badge
+        badge.textContent = statusText;
+        badge.className = `status-badge status-${status}`;
+        
+        // Aktualizuj menu - zaznacz aktualny status
+        menu.querySelectorAll('.status-option').forEach(option => {
+            option.classList.remove('current');
+        });
+        const currentOption = menu.querySelector(`[data-status="${status}"]`);
+        if (currentOption) {
+            currentOption.classList.add('current');
+        }
+        
+        // Ukryj menu z animacją
+        menu.classList.remove('show');
+        setTimeout(() => {
+            menu.style.display = 'none';
+            menu.classList.remove('menu-up');
+        }, 200);
+        
+        // Pokaż toast notification
+        showToast(`Status zmieniony na: ${statusText}`, 'success');
+        
+        console.log(`✅ Status notatki ${noteId} zmieniony na: ${status}`);
+        
+    } catch (error) {
+        console.error('❌ Błąd aktualizacji statusu:', error);
+        showToast(`Błąd: ${error.message}`, 'error');
+    }
+}
+
+// SYSTEM POWIADOMIEŃ (TOAST)
+function showToast(message, type = 'info') {
+    // Utwórz toast container jeśli nie istnieje
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toast-container';
+        toastContainer.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        `;
+        document.body.appendChild(toastContainer);
+    }
+
+    // Utwórz toast
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        padding: 12px 20px;
+        border-radius: 6px;
+        color: white;
+        font-size: 14px;
+        font-weight: 500;
+        max-width: 300px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transform: translateX(100%);
+        transition: all 0.3s ease-out;
+        background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#17a2b8'};
+    `;
+    toast.textContent = message;
+
+    toastContainer.appendChild(toast);
+
+    // Animacja pojawiania
+    setTimeout(() => {
+        toast.style.transform = 'translateX(0)';
+    }, 10);
+
+    // Automatyczne usunięcie po 3 sekundach
+    setTimeout(() => {
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 300);
+    }, 3000);
+}
+
+// Ukryj menu statusów po kliknięciu poza nim
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.status-container')) {
+        document.querySelectorAll('.status-menu').forEach(menu => {
+            menu.classList.remove('show');
+            setTimeout(() => {
+                menu.style.display = 'none';
+                menu.classList.remove('menu-up');
+            }, 200);
+        });
+    }
+});
+
 console.log('✅ note-core.js załadowany');

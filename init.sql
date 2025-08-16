@@ -26,6 +26,7 @@ CREATE TABLE notatki (
     samochod_id INTEGER REFERENCES samochody(id) ON DELETE SET NULL,
     typ_notatki VARCHAR(20) NOT NULL CHECK (typ_notatki IN ('szybka', 'pojazd')),
     tresc TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'nowa' CHECK (status IN ('nowa', 'w_trakcie', 'zakonczona', 'anulowana', 'oczekuje')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

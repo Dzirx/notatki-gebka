@@ -451,3 +451,38 @@ def get_notatka_szczegoly(notatka_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Błąd pobierania szczegółów: {str(e)}")
+    
+@router.put("/notatka/{notatka_id}/status")
+async def update_notatka_status(notatka_id: int, request: Request, db: Session = Depends(get_db)):
+    """Aktualizacja statusu notatki (AJAX)"""
+    try:
+        data = await request.json()
+        new_status = data.get("status")
+        
+        # Walidacja statusu
+        allowed_statuses = ['nowa', 'w_trakcie', 'zakonczona', 'anulowana', 'oczekuje']
+        if new_status not in allowed_statuses:
+            raise HTTPException(status_code=400, detail="Nieprawidłowy status")
+        
+        # Znajdź notatkę
+        notatka = crud.get_notatka_by_id(db, notatka_id)
+        if not notatka:
+            raise HTTPException(status_code=404, detail="Notatka nie znaleziona")
+        
+        # Aktualizuj status
+        notatka.status = new_status
+        db.commit()
+        db.refresh(notatka)
+        
+        return {
+            "success": True,
+            "message": f"Status zmieniony na '{new_status}'",
+            "new_status": new_status,
+            "notatka_id": notatka_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Błąd aktualizacji statusu: {str(e)}")

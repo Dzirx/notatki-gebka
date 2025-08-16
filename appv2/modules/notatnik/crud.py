@@ -1,6 +1,6 @@
 # === MODULES/NOTATNIK/CRUD.PY - OPERACJE BAZODANOWE ===
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import text
+from sqlalchemy import text, func
 from models import Notatka, Samochod, Kosztorys, KosztorysTowar, KosztorysUsluga, Towar, Usluga, Klient
 from typing import List, Dict, Any
 
@@ -14,7 +14,7 @@ def get_wszystkie_notatki(db: Session, skip: int = 0, limit: int = 100):
 
 def create_notatka_szybka(db: Session, tresc: str):
     """Tworzy notatkę ogólną (szybką) - nie przypisaną do konkretnego samochodu"""
-    db_notatka = Notatka(samochod_id=None, typ_notatki="szybka", tresc=tresc)
+    db_notatka = Notatka(samochod_id=None, typ_notatki="szybka", tresc=tresc, status="nowa")
     db.add(db_notatka)
     db.commit()
     db.refresh(db_notatka)
@@ -22,7 +22,7 @@ def create_notatka_szybka(db: Session, tresc: str):
 
 def create_notatka_samochod(db: Session, samochod_id: int, tresc: str):
     """Tworzy notatkę przypisaną do konkretnego samochodu"""
-    db_notatka = Notatka(samochod_id=samochod_id, typ_notatki="pojazd", tresc=tresc)
+    db_notatka = Notatka(samochod_id=samochod_id, typ_notatki="pojazd", tresc=tresc, status="nowa")
     db.add(db_notatka)
     db.commit()
     db.refresh(db_notatka)
@@ -435,5 +435,29 @@ def delete_kosztorys(db: Session, kosztorys_id: int):
         print(f"Błąd usuwania kosztorysu {kosztorys_id}: {e}")
         return False
 
-# POPRAWKA: Dodaj brakujący import na górze pliku
-from sqlalchemy import func
+def update_notatka_status(db: Session, notatka_id: int, new_status: str):
+    """Aktualizuje status notatki"""
+    try:
+        # Znajdź notatkę
+        notatka = db.query(Notatka).filter(Notatka.id == notatka_id).first()
+        
+        if not notatka:
+            return None
+        
+        # Walidacja statusu
+        allowed_statuses = ['nowa', 'w_trakcie', 'zakonczona', 'anulowana', 'oczekuje']
+        if new_status not in allowed_statuses:
+            raise ValueError(f"Nieprawidłowy status: {new_status}")
+        
+        # Aktualizuj status
+        notatka.status = new_status
+        notatka.updated_at = datetime.utcnow()  # Jeśli masz pole updated_at
+        
+        db.commit()
+        db.refresh(notatka)
+        
+        return notatka
+        
+    except Exception as e:
+        db.rollback()
+        raise e

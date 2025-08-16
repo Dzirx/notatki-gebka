@@ -29,7 +29,11 @@
         <div class="actions-bar">
             <button class="btn-warning" onclick="editSelected()">✏️ Edytuj zaznaczone</button>
             <button class="btn-danger" onclick="deleteSelected()">🗑️ Usuń zaznaczone</button>
-            <span style="margin-left: 15px; color: #6c757d;">Zaznacz notatki checkboxami w tabeli</span>
+            
+            <!-- PRZYCISK FILTRA -->
+            <button class="btn-info" id="toggleCompletedBtn" onclick="toggleCompletedNotes()">
+                ✅ Tylko zakończone
+            </button>
         </div>
 
         <!-- TABELA NOTATEK -->
@@ -50,8 +54,8 @@
             </thead>
             <tbody>
                 {% for notatka in notatki %}
-                <tr class="notatka-{{ notatka.typ_notatki }}" data-note-id="{{ notatka.id }}" data-nr-rej="{% if notatka.samochod %}{{ notatka.samochod.nr_rejestracyjny }}{% endif %}">
-                    <td>
+                <tr class="notatka-{{ notatka.typ_notatki }}" data-note-id="{{ notatka.id }}" data-nr-rej="{% if notatka.samochod %}{{ notatka.samochod.nr_rejestracyjny }}{% endif %}" data-status="{{ notatka.status|default('nowa') }}">
+                <td>
                         <input type="checkbox" class="note-checkbox" value="{{ notatka.id }}">
                     </td>
                     <td>
@@ -109,7 +113,7 @@
                     <td>
                         {% if notatka.kosztorysy %}
                             {% for kosztorys in notatka.kosztorysy %}
-                                <a href="/notatnik/kosztorys/{{ notatka.id }}" class="btn-small" style="display: block; margin-bottom: 5px;">
+                                <a href="/notatnik/kosztorys-detail/{{ kosztorys.id }}" class="btn-small" style="display: block; margin-bottom: 5px;">
                                     💰 {{ kosztorys.numer_kosztorysu or 'KOS' }} - {{ "%.2f"|format(kosztorys.kwota_calkowita) }} zł
                                 </a>
                             {% endfor %}

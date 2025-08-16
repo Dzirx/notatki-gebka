@@ -461,3 +461,81 @@ def update_notatka_status(db: Session, notatka_id: int, new_status: str):
     except Exception as e:
         db.rollback()
         raise e
+    
+def get_kosztorys_by_id(db: Session, kosztorys_id: int):
+    """Pobiera kosztorys po ID"""
+    return db.query(Kosztorys).filter(Kosztorys.id == kosztorys_id).first()
+
+def get_kosztorys_szczegoly(db: Session, kosztorys_id: int) -> Dict[str, Any]:
+    """Pobiera szczegóły konkretnego kosztorysu z towarami i usługami"""
+    
+    query = text("""
+        SELECT 
+            k.id as kosztorys_id,
+            k.numer_kosztorysu,
+            k.kwota_calkowita,
+            k.opis as kosztorys_opis,
+            k.status,
+            k.created_at,
+            
+            t.nazwa as towar_nazwa,
+            kt.ilosc as towar_ilosc,
+            kt.cena as towar_cena,
+            
+            u.nazwa as usluga_nazwa,
+            ku.ilosc as usluga_ilosc,
+            ku.cena as usluga_cena
+            
+        FROM kosztorysy k
+        LEFT JOIN kosztorysy_towary kt ON k.id = kt.kosztorys_id
+        LEFT JOIN towary t ON kt.towar_id = t.id
+        LEFT JOIN kosztorysy_uslug ku ON k.id = ku.kosztorys_id
+        LEFT JOIN uslugi u ON ku.uslugi_id = u.id
+        WHERE k.id = :kosztorys_id
+        ORDER BY t.nazwa ASC, u.nazwa ASC
+    """)
+    
+    result = db.execute(query, {"kosztorys_id": kosztorys_id})
+    rows = result.fetchall()
+    
+    if not rows:
+        return None
+    
+    # Pierwszy wiersz zawiera podstawowe dane kosztorysu
+    first_row = rows[0]
+    
+    kosztorys_data = {
+        "id": first_row.kosztorys_id,
+        "numer": first_row.numer_kosztorysu,
+        "kwota_calkowita": float(first_row.kwota_calkowita) if first_row.kwota_calkowita else 0.0,
+        "opis": first_row.kosztorys_opis,
+        "status": first_row.status,
+        "created_at": first_row.created_at,
+        "towary": [],
+        "uslugi": []
+    }
+    
+    # Zbierz unikalne towary i usługi
+    towary_set = set()
+    uslugi_set = set()
+    
+    for row in rows:
+        if row.towar_nazwa and row.towar_nazwa not in towary_set:
+            kosztorys_data["towary"].append({
+                "nazwa": row.towar_nazwa,
+                "ilosc": float(row.towar_ilosc),
+                "cena": float(row.towar_cena),
+                "wartosc": float(row.towar_ilosc) * float(row.towar_cena)
+            })
+            towary_set.add(row.towar_nazwa)
+        
+        if row.usluga_nazwa and row.usluga_nazwa not in uslugi_set:
+            kosztorys_data["uslugi"].append({
+                "nazwa": row.usluga_nazwa,
+                "ilosc": float(row.usluga_ilosc),
+                "cena": float(row.usluga_cena),
+                "wartosc": float(row.usluga_ilosc) * float(row.usluga_cena)
+            })
+            uslugi_set.add(row.usluga_nazwa)
+    
+    return kosztorys_data

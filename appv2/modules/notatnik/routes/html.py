@@ -64,3 +64,26 @@ async def szczegoly_kosztorysu(notatka_id: int, request: Request, db: Session = 
         "notatka": notatka,
         "kosztorysy": kosztorysy
     })
+
+@router.get("/kosztorys-detail/{kosztorys_id}", response_class=HTMLResponse)
+async def szczegoly_pojedynczego_kosztorysu(kosztorys_id: int, request: Request, db: Session = Depends(get_db)):
+    """Szczegóły konkretnego kosztorysu"""
+    
+    # Pobierz kosztorys
+    kosztorys = crud.get_kosztorys_by_id(db, kosztorys_id)
+    if not kosztorys:
+        raise HTTPException(status_code=404, detail="Kosztorys nie znaleziony")
+    
+    # Pobierz notatkę powiązaną z kosztorysem
+    notatka = crud.get_notatka_by_id(db, kosztorys.notatka_id)
+    if not notatka:
+        raise HTTPException(status_code=404, detail="Notatka nie znaleziona")
+    
+    # Pobierz szczegóły kosztorysu z towarami i usługami
+    kosztorys_details = crud.get_kosztorys_szczegoly(db, kosztorys_id)
+    
+    return templates.TemplateResponse("kosztorys_single.html", {
+        "request": request,
+        "notatka": notatka,
+        "kosztorys": kosztorys_details
+    })

@@ -1,16 +1,20 @@
 # === MODULES/NOTATNIK/ROUTES/API.PY - API NOTATNIKA ===
-from fastapi import APIRouter, Depends, Request, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, Request, HTTPException, BackgroundTasks, UploadFile, File
+from fastapi.responses import FileResponse
 import time
+import uuid
+import os
+from pathlib import Path
 from sqlalchemy.orm import Session
 from database import get_db, get_samochody_db
-from sqlalchemy import text
+from sqlalchemy import text, or_
 import sys
-import os
 
 # Dodaj ścieżkę do głównego katalogu
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from modules.notatnik import crud
+from models import Pracownik, Zalacznik, Przypomnienie, Notatka, Towar, Usluga
 
 router = APIRouter()
 
@@ -24,14 +28,20 @@ def get_notatka_api(notatka_id: int, db: Session = Depends(get_db)):
     return {
         "id": notatka.id, 
         "tresc": notatka.tresc, 
-        "typ_notatki": notatka.typ_notatki
+        "typ_notatki": notatka.typ_notatki,
+        "pracownik_id": notatka.pracownik_id
     }
 
 @router.put("/notatka/{notatka_id}")
 async def edit_notatka(notatka_id: int, request: Request, db: Session = Depends(get_db)):
     """Edycja notatki (AJAX)"""
     data = await request.json()
-    notatka = crud.update_notatka(db, notatka_id, data["tresc"])
+    notatka = crud.update_notatka_with_employee(
+        db, 
+        notatka_id, 
+        data["tresc"], 
+        data.get("pracownik_id")
+    )
     
     if not notatka:
         raise HTTPException(status_code=404, detail="Notatka nie znaleziona")
@@ -71,9 +81,62 @@ def get_towary_api(db: Session = Depends(get_db)):
         {
             "id": t.id,
             "nazwa": t.nazwa,
+            "numer_katalogowy": t.numer_katalogowy,
             "cena": float(t.cena) if t.cena else 0.0
         }
         for t in towary
+    ]
+
+@router.get("/towary/search")
+def search_towary_api(
+    q: str = "", 
+    limit: int = 10,
+    db: Session = Depends(get_db)
+):
+    """Wyszukiwanie towarów po nazwie lub numerze katalogowym"""
+    if not q or len(q) < 2:
+        return []
+    
+    towary = db.query(Towar).filter(
+        or_(
+            Towar.nazwa.ilike(f"%{q}%"),
+            Towar.numer_katalogowy.ilike(f"%{q}%")
+        )
+    ).limit(limit).all()
+    
+    return [
+        {
+            "id": t.id,
+            "nazwa": t.nazwa,
+            "numer_katalogowy": t.numer_katalogowy,
+            "cena": float(t.cena) if t.cena else 0.0,
+            "display": f"{t.numer_katalogowy or 'N/A'} - {t.nazwa}"
+        }
+        for t in towary
+    ]
+
+@router.get("/uslugi/search")
+def search_uslugi_api(
+    q: str = "", 
+    limit: int = 10,
+    db: Session = Depends(get_db)
+):
+    """Wyszukiwanie usług po nazwie"""
+    if not q or len(q) < 2:
+        return []
+    
+    uslugi = db.query(Usluga).filter(
+        Usluga.nazwa.ilike(f"%{q}%")
+    ).limit(limit).all()
+    
+    return [
+        {
+            "id": u.id,
+            "nazwa": u.nazwa,
+            "cena": float(u.cena) if u.cena else 0.0,
+            "display": f"{u.nazwa}"
+        }
+        for u in uslugi
     ]
 
 @router.get("/uslugi")
@@ -87,6 +150,20 @@ def get_uslugi_api(db: Session = Depends(get_db)):
             "cena": float(u.cena) if u.cena else 0.0
         }
         for u in uslugi
+    ]
+
+@router.get("/pracownicy")
+def get_pracownicy_api(db: Session = Depends(get_db)):
+    """Lista wszystkich pracowników"""
+    pracownicy = db.query(Pracownik).all()
+    return [
+        {
+            "id": p.id,
+            "imie": p.imie,
+            "nazwisko": p.nazwisko,
+            "pelne_imie": f"{p.imie} {p.nazwisko}"
+        }
+        for p in pracownicy
     ]
 
 @router.get("/kosztorysy-zewnetrzne/{nr_rejestracyjny}")
@@ -260,7 +337,7 @@ async def sync_towary_z_integra(
     db: Session = Depends(get_db), 
     db_sql: Session = Depends(get_samochody_db)
 ):
-    """Synchronizuje towary i usługi z bazy integra (SQL Server) do PostgreSQL"""
+    """Synchronizuje towary i usługi z bazy integra (SQL Server) do bazy sql"""
     
     if db_sql is None:
         raise HTTPException(status_code=503, detail="Brak połączenia z bazą danych integra")
@@ -271,7 +348,7 @@ async def sync_towary_z_integra(
         print("🔄 Rozpoczynam synchronizację towarów i usług z SQL Server...")
         
         # Synchronizuj towary i usługi
-        stats = await crud.sync_towary_i_uslugi_from_sql(db, db_sql)
+        stats = await crud.sync_towary_i_uslugi(db, db_sql)
         
         end_time = time.time()
         execution_time = round(end_time - start_time, 2)
@@ -460,7 +537,7 @@ async def update_notatka_status(notatka_id: int, request: Request, db: Session =
         new_status = data.get("status")
         
         # Walidacja statusu
-        allowed_statuses = ['nowa', 'w_trakcie', 'zakonczona', 'anulowana', 'oczekuje']
+        allowed_statuses = ['nowa', 'w_trakcie', 'zakonczona', 'dostarczony', 'klient_poinformowany']
         if new_status not in allowed_statuses:
             raise HTTPException(status_code=400, detail="Nieprawidłowy status")
         
@@ -486,3 +563,348 @@ async def update_notatka_status(notatka_id: int, request: Request, db: Session =
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Błąd aktualizacji statusu: {str(e)}")
+
+@router.get("/notatki/{notatka_id}/details")
+async def get_notatka_details(notatka_id: int, db: Session = Depends(get_db)):
+    """Pobiera dodatkowe informacje o notatce"""
+    try:
+        notatka = crud.get_notatka_by_id(db, notatka_id)
+        if not notatka:
+            raise HTTPException(status_code=404, detail="Notatka nie znaleziona")
+        
+        return {
+            "data_dostawy": notatka.data_dostawy.isoformat() if notatka.data_dostawy else None,
+            "dostawca": notatka.dostawca,
+            "nr_vat_dot": notatka.nr_vat_dot,
+            "miejsce_prod": notatka.miejsce_prod
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Błąd pobierania dodatkowych informacji: {str(e)}")
+
+@router.put("/notatki/{notatka_id}/details")
+async def update_notatka_details(notatka_id: int, request: Request, db: Session = Depends(get_db)):
+    """Aktualizuje dodatkowe informacje o notatce"""
+    try:
+        data = await request.json()
+        
+        # Znajdź notatkę
+        notatka = crud.get_notatka_by_id(db, notatka_id)
+        if not notatka:
+            raise HTTPException(status_code=404, detail="Notatka nie znaleziona")
+        
+        # Aktualizuj pola
+        from datetime import datetime
+        
+        if data.get("data_dostawy"):
+            notatka.data_dostawy = datetime.fromisoformat(data["data_dostawy"].replace('Z', '+00:00'))
+        else:
+            notatka.data_dostawy = None
+            
+        notatka.dostawca = data.get("dostawca")
+        notatka.nr_vat_dot = data.get("nr_vat_dot")
+        notatka.miejsce_prod = data.get("miejsce_prod")
+        
+        db.commit()
+        db.refresh(notatka)
+        
+        return {
+            "success": True,
+            "message": "Dodatkowe informacje zostały zapisane"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Błąd aktualizacji dodatkowych informacji: {str(e)}")
+
+# === ZAŁĄCZNIKI ===
+
+@router.post("/notatka/{notatka_id}/upload")
+async def upload_file(
+    notatka_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Przesyła plik i przypisuje do notatki"""
+    
+    # Sprawdź czy notatka istnieje
+    notatka = crud.get_notatka_by_id(db, notatka_id)
+    if not notatka:
+        raise HTTPException(status_code=404, detail="Notatka nie znaleziona")
+    
+    # Walidacja pliku
+    MAX_SIZE = 10 * 1024 * 1024  # 10MB
+    ALLOWED_TYPES = [
+        "image/jpeg", "image/png", "image/gif",
+        "application/pdf", 
+        "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "text/plain", "text/csv"
+    ]
+    
+    if file.size > MAX_SIZE:
+        raise HTTPException(status_code=413, detail="Plik jest za duży (max 10MB)")
+    
+    if file.content_type not in ALLOWED_TYPES:
+        raise HTTPException(status_code=415, detail="Nieobsługiwany typ pliku")
+    
+    try:
+        # Utwórz folder jeśli nie istnieje
+        from datetime import datetime
+        now = datetime.now()
+        upload_dir = Path(f"notatnik/uploads/{now.year}/{now.month:02d}")
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generuj unikalną nazwę pliku
+        file_extension = Path(file.filename).suffix
+        unique_filename = f"{uuid.uuid4()}{file_extension}"
+        file_path = upload_dir / unique_filename
+        
+        # Zapisz plik
+        content = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(content)
+        
+        # Zapisz w bazie danych
+        zalacznik = Zalacznik(
+            notatka_id=notatka_id,
+            nazwa_pliku=file.filename,
+            rozmiar=len(content),
+            typ_mime=file.content_type,
+            sciezka=str(file_path)
+        )
+        db.add(zalacznik)
+        db.commit()
+        db.refresh(zalacznik)
+        
+        return {
+            "success": True,
+            "zalacznik_id": zalacznik.id,
+            "nazwa_pliku": zalacznik.nazwa_pliku,
+            "rozmiar": zalacznik.rozmiar
+        }
+        
+    except Exception as e:
+        db.rollback()
+        # Usuń plik jeśli wystąpił błąd
+        if 'file_path' in locals() and file_path.exists():
+            file_path.unlink()
+        raise HTTPException(status_code=500, detail=f"Błąd przesyłania pliku: {str(e)}")
+
+@router.get("/zalacznik/{zalacznik_id}")
+def download_file(zalacznik_id: int, db: Session = Depends(get_db)):
+    """Pobiera plik załącznika"""
+    
+    zalacznik = db.query(Zalacznik).filter(Zalacznik.id == zalacznik_id).first()
+    if not zalacznik:
+        raise HTTPException(status_code=404, detail="Załącznik nie znaleziony")
+    
+    file_path = Path(zalacznik.sciezka)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Plik nie istnieje na serwerze")
+    
+    return FileResponse(
+        path=str(file_path),
+        filename=zalacznik.nazwa_pliku,
+        media_type=zalacznik.typ_mime
+    )
+
+@router.delete("/zalacznik/{zalacznik_id}")
+def delete_file(zalacznik_id: int, db: Session = Depends(get_db)):
+    """Usuwa załącznik"""
+    
+    zalacznik = db.query(Zalacznik).filter(Zalacznik.id == zalacznik_id).first()
+    if not zalacznik:
+        raise HTTPException(status_code=404, detail="Załącznik nie znaleziony")
+    
+    try:
+        # Usuń plik z dysku
+        file_path = Path(zalacznik.sciezka)
+        if file_path.exists():
+            file_path.unlink()
+        
+        # Usuń z bazy
+        db.delete(zalacznik)
+        db.commit()
+        
+        return {"success": True, "message": "Załącznik został usunięty"}
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Błąd usuwania załącznika: {str(e)}")
+
+@router.get("/notatka/{notatka_id}/zalaczniki")
+def get_note_attachments(notatka_id: int, db: Session = Depends(get_db)):
+    """Pobiera listę załączników dla notatki"""
+    
+    zalaczniki = db.query(Zalacznik).filter(Zalacznik.notatka_id == notatka_id).all()
+    
+    return [
+        {
+            "id": z.id,
+            "nazwa_pliku": z.nazwa_pliku,
+            "rozmiar": z.rozmiar,
+            "typ_mime": z.typ_mime,
+            "created_at": z.created_at.isoformat()
+        }
+        for z in zalaczniki
+    ]
+
+# === PRZYPOMNIENIA ===
+
+@router.post("/notatka/{notatka_id}/przypomnienie")
+async def add_reminder(notatka_id: int, request: Request, db: Session = Depends(get_db)):
+    """Dodaje przypomnienie do notatki"""
+    try:
+        data = await request.json()
+        data_przypomnienia_str = data.get("data_przypomnienia")
+        
+        if not data_przypomnienia_str:
+            raise HTTPException(status_code=400, detail="Brak daty przypomnienia")
+        
+        # Sprawdź czy notatka istnieje
+        notatka = crud.get_notatka_by_id(db, notatka_id)
+        if not notatka:
+            raise HTTPException(status_code=404, detail="Notatka nie znaleziona")
+        
+        # Parse daty
+        from datetime import datetime
+        data_przypomnienia = datetime.fromisoformat(data_przypomnienia_str.replace('Z', '+00:00'))
+        
+        # Utwórz przypomnienie
+        przypomnienie = Przypomnienie(
+            notatka_id=notatka_id,
+            data_przypomnienia=data_przypomnienia,
+            wyslane=0
+        )
+        
+        db.add(przypomnienie)
+        db.commit()
+        db.refresh(przypomnienie)
+        
+        return {
+            "success": True,
+            "przypomnienie_id": przypomnienie.id,
+            "message": "Przypomnienie zostało dodane"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Błąd dodawania przypomnienia: {str(e)}")
+
+@router.get("/notatka/{notatka_id}/przypomnienia")
+def get_note_reminders(notatka_id: int, db: Session = Depends(get_db)):
+    """Pobiera wszystkie przypomnienia dla notatki"""
+    try:
+        przypomnienia = db.query(Przypomnienie).filter(
+            Przypomnienie.notatka_id == notatka_id
+        ).order_by(Przypomnienie.data_przypomnienia).all()
+        
+        return [
+            {
+                "id": p.id,
+                "data_przypomnienia": p.data_przypomnienia.isoformat(),
+                "wyslane": bool(p.wyslane),
+                "created_at": p.created_at.isoformat()
+            }
+            for p in przypomnienia
+        ]
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Błąd pobierania przypomnień: {str(e)}")
+
+@router.delete("/przypomnienie/{przypomnienie_id}")
+def delete_reminder(przypomnienie_id: int, db: Session = Depends(get_db)):
+    """Usuwa przypomnienie"""
+    try:
+        przypomnienie = db.query(Przypomnienie).filter(
+            Przypomnienie.id == przypomnienie_id
+        ).first()
+        
+        if not przypomnienie:
+            raise HTTPException(status_code=404, detail="Przypomnienie nie znalezione")
+        
+        db.delete(przypomnienie)
+        db.commit()
+        
+        return {"success": True, "message": "Przypomnienie zostało usunięte"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Błąd usuwania przypomnienia: {str(e)}")
+
+@router.get("/przypomnienia/dzisiaj")
+def get_today_reminders(db: Session = Depends(get_db)):
+    """Pobiera notatki które mają przypomnienie na dzisiaj"""
+    try:
+        from datetime import date, datetime
+        from sqlalchemy import and_, func
+        
+        dzisiaj = date.today()
+        
+        # Pobierz notatki z przypomnieniami na dzisiaj (niewyslane)
+        query = db.query(
+            Notatka.id,
+            Notatka.tresc,
+            Notatka.typ_notatki,
+            Notatka.status,
+            Notatka.created_at,
+            Przypomnienie.data_przypomnienia,
+            Przypomnienie.id.label('przypomnienie_id')
+        ).join(
+            Przypomnienie, Notatka.id == Przypomnienie.notatka_id
+        ).filter(
+            and_(
+                func.date(Przypomnienie.data_przypomnienia) == dzisiaj,
+                Przypomnienie.wyslane == 0
+            )
+        ).order_by(Przypomnienie.data_przypomnienia)
+        
+        results = query.all()
+        
+        notatki_dzisiaj = []
+        for result in results:
+            # Pobierz dodatkowe dane o notatce
+            notatka_details = crud.get_notatka_szczegoly(db, result.id)
+            
+            notatka_data = {
+                "id": result.id,
+                "tresc": result.tresc,
+                "typ_notatki": result.typ_notatki,
+                "status": result.status,
+                "created_at": result.created_at.isoformat(),
+                "data_przypomnienia": result.data_przypomnienia.isoformat(),
+                "przypomnienie_id": result.przypomnienie_id,
+                "samochod": None
+            }
+            
+            # Dodaj info o samochodzie jeśli istnieje
+            if notatka_details and notatka_details.samochod:
+                notatka_data["samochod"] = {
+                    "nr_rejestracyjny": notatka_details.samochod.nr_rejestracyjny,
+                    "marka": notatka_details.samochod.marka,
+                    "model": notatka_details.samochod.model,
+                    "klient": {
+                        "nazwapelna": notatka_details.samochod.klient.nazwapelna if notatka_details.samochod.klient else None
+                    }
+                }
+            
+            notatki_dzisiaj.append(notatka_data)
+        
+        return {
+            "notatki": notatki_dzisiaj,
+            "count": len(notatki_dzisiaj),
+            "date": dzisiaj.isoformat()
+        }
+        
+    except Exception as e:
+        print(f"Błąd pobierania dzisiejszych przypomnień: {e}")
+        raise HTTPException(status_code=500, detail=f"Błąd pobierania przypomnień: {str(e)}")

@@ -72,11 +72,22 @@ th {
     border-radius: 4px;
     display: inline-block;
     transition: all 0.3s;
+    border: none;
+    cursor: pointer;
 }
 
 .btn-small:hover {
     background: #218838;
     transform: translateY(-1px);
+}
+
+.btn-small.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-small.btn-secondary:hover {
+    background: #5a6268;
 }
 
 .status-badge {
@@ -100,8 +111,8 @@ th {
 .status-nowa { background: #cce7ff; color: #004085; }
 .status-w_trakcie { background: #fff3cd; color: #856404; }
 .status-zakonczona { background: #d4edda; color: #155724; }
-.status-anulowana { background: #f8d7da; color: #721c24; }
-.status-oczekuje { background: #ffeaa7; color: #6c5ce7; }
+.status-dostarczony { background: #ffeaa7; color: #856404; }
+.status-klient_poinformowany { background: #f8d7da; color: #721c24; }
 
 /* STARE STATUSY - ZACHOWANE DLA KOMPATYBILNOŚCI */
 .status-aktywna { background: #d4edda; color: #155724; }
@@ -340,18 +351,13 @@ th {
     }
 }
 
+/* Usunięte - JS obsługuje ukrywanie zakończonych 
 tr[data-status="zakonczona"] {
     display: none;
-}
+} */
 
-/* TRYB: TYLKO ZAKOŃCZONE */
-.only-completed tr:not([data-status="zakonczona"]) {
-    display: none;
-}
-
-.only-completed tr[data-status="zakonczona"] {
-    display: table-row;
-}
+/* TRYB: TYLKO ZAKOŃCZONE - kontrolowane przez JavaScript */
+/* CSS usunięte - pełna kontrola przez filterNotatkiByRej() */
 
 .actions-bar button {
     padding: 10px 16px;
@@ -377,4 +383,132 @@ tr[data-status="zakonczona"] {
     background: #0c7489;
     box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
     transform: translateY(0);
+}
+
+/* === STYLE PAGINACJI === */
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.pagination-controls select {
+    padding: 5px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.table-info {
+    color: #6c757d;
+    font-size: 14px;
+}
+
+.pagination-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+}
+
+.pagination {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.pagination button {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.pagination button:hover:not(:disabled) {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.pagination button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.page-btn {
+    min-width: 40px;
+}
+
+.page-btn.active {
+    background: #007bff !important;
+    color: white !important;
+    border-color: #007bff !important;
+}
+
+.pagination-info {
+    color: #6c757d;
+    font-size: 14px;
+}
+
+.pagination-jump {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #6c757d;
+    font-size: 14px;
+}
+
+.pagination-jump input {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-align: center;
+}
+
+#pageNumbers {
+    display: flex;
+    gap: 2px;
+}
+
+/* RESPONSYWNOŚĆ PAGINACJI */
+@media (max-width: 768px) {
+    .pagination-wrapper {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+
+    .table-header {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+
+    .pagination-controls {
+        margin-left: 0;
+    }
+
+    .pagination {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
+
+.pagination-count {
+    color: #6c757d;
+    font-size: 14px;
 }

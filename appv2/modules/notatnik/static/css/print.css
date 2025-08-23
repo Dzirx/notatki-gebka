@@ -1,0 +1,165 @@
+/* === PROSTY I SCHLUDNY CSS DO DRUKOWANIA === */
+
+@media print {
+    /* UKRYJ NIEPOTRZEBNE ELEMENTY */
+    .no-print,
+    .btn-primary,
+    .btn-secondary,
+    .header div,
+    button {
+        display: none !important;
+    }
+    
+    /* UKRYJ SEKCJĘ DOSTAW */
+    .delivery-section {
+        display: none !important;
+    }
+    
+    /* USTAWIENIA STRONY */
+    @page {
+        margin: 2cm;
+        size: A4;
+    }
+    
+    /* PODSTAWOWE USTAWIENIA */
+    body {
+        font-family: Arial, sans-serif;
+        font-size: 12pt;
+        line-height: 1.4;
+        color: #000;
+        background: white;
+        margin: 0;
+        padding: 0;
+    }
+    
+    .container {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+    }
+    
+    /* UKRYJ DATĘ WYDRUKU */
+    #print-info {
+        display: none !important;
+    }
+    
+    /* UKRYJ CAŁY HEADER */
+    .header {
+        display: none !important;
+    }
+    
+    /* SEKCJE */
+    .card {
+        margin: 0 0 20pt 0;
+        padding: 0;
+        border: none;
+        background: white;
+    }
+    
+    /* NAGŁÓWKI SEKCJI */
+    .card h3 {
+        font-size: 14pt;
+        font-weight: bold;
+        margin: 0 0 10pt 0;
+        padding: 5pt 0;
+        border-bottom: 1pt solid #ccc;
+        background: #f8f8f8;
+        text-align: center;
+    }
+    
+    .card h4 {
+        font-size: 12pt;
+        font-weight: bold;
+        margin: 15pt 0 8pt 0;
+        padding: 3pt 0;
+        border-bottom: 1pt solid #ddd;
+    }
+    
+    /* TEKST W SEKCJACH */
+    .card p {
+        margin: 3pt 0;
+        font-size: 11pt;
+        line-height: 1.3;
+    }
+    
+    /* WZMOCNIENIA TEKSTU */
+    strong {
+        font-weight: bold;
+    }
+    
+    /* TABELE */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10pt 0;
+        background: white;
+    }
+    
+    th {
+        background: #f0f0f0;
+        font-weight: bold;
+        font-size: 11pt;
+        padding: 8pt;
+        border: 1pt solid #000;
+        text-align: center;
+    }
+    
+    td {
+        font-size: 10pt;
+        padding: 6pt 8pt;
+        border: 1pt solid #000;
+        text-align: left;
+        vertical-align: top;
+    }
+    
+    /* KOLUMNA Z KWOTAMI */
+    td:last-child {
+        text-align: right;
+        font-weight: bold;
+    }
+    
+    /* INFORMACJE O KWOTACH */
+    div[style*="display: flex"] {
+        display: block !important;
+        margin: 8pt 0;
+    }
+    
+    div[style*="display: flex"] > div {
+        display: inline-block;
+        margin-right: 30pt;
+        font-size: 11pt;
+    }
+    
+    /* UKRYJ WSZYSTKIE LINIE HR */
+    hr {
+        display: none !important;
+    }
+    
+    /* ODSTĘPY MIĘDZY ELEMENTAMI */
+    .mb-4 {
+        margin-bottom: 15pt !important;
+    }
+    
+    /* UNIKAJ DZIELENIA ELEMENTÓW */
+    .card,
+    table,
+    tr {
+        page-break-inside: avoid;
+    }
+    
+    /* NAGŁÓWKI TABEL NA KAŻDEJ STRONIE */
+    thead {
+        display: table-header-group;
+    }
+}
+
+/* ELEMENTY WIDOCZNE TYLKO PRZY DRUKU */
+.print-only {
+    display: none;
+}
+
+@media print {
+    .print-only {
+        display: block !important;
+    }
+}

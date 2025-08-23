@@ -76,7 +76,12 @@ async def magazyn_search(
 
     if tab == "terminarz":
         try:
-            pojazdy_grouped = crud.get_pojazdy_grouped_for_terminarz(db, selected_date)
+            if tylko_towar_bool:
+                # Tryb tylko towary/usługi
+                pojazdy_grouped = crud.get_pojazdy_tylko_towary_terminarz(db, selected_date)
+            else:
+                # Tryb normalny (opony + towary)
+                pojazdy_grouped = crud.get_pojazdy_grouped_for_terminarz(db, selected_date)
         except Exception as e:
             pojazdy_grouped = []
             error_message = f"Błąd podczas pobierania terminarza: {e}"

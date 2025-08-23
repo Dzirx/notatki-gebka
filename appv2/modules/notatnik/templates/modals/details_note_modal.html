@@ -1,0 +1,36 @@
+<!-- MODAL DODATKOWE INFORMACJE O NOTATCE -->
+<div id="detailsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>📋 Informacje dostawa <span id="detailsNoteId"></span></h2>
+            <span class="close" onclick="closeDetailsModal()">&times;</span>
+        </div>
+        
+        <form id="detailsForm">
+            <div class="form-group">
+                <label for="detailsDataDostawy">Data dostawy:</label>
+                <input type="date" id="detailsDataDostawy" name="data_dostawy">
+            </div>
+            
+            <div class="form-group">
+                <label for="detailsDostawca">Dostawca:</label>
+                <input type="text" id="detailsDostawca" name="dostawca" placeholder="Nazwa dostawcy">
+            </div>
+            
+            <div class="form-group">
+                <label for="detailsNrVatDot">Nr VAT DOT:</label>
+                <input type="text" id="detailsNrVatDot" name="nr_vat_dot" placeholder="Numer VAT DOT">
+            </div>
+            
+            <div class="form-group">
+                <label for="detailsMiejsceProd">Miejsce produkcji:</label>
+                <input type="text" id="detailsMiejsceProd" name="miejsce_prod" placeholder="Miejsce produkcji">
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeDetailsModal()">Anuluj</button>
+                <button type="submit" class="btn-primary">💾 Zapisz informacje</button>
+            </div>
+        </form>
+    </div>
+</div>

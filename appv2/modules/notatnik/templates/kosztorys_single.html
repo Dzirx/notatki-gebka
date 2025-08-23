@@ -132,20 +132,6 @@
         </div>
         {% endif %}
 
-        <!-- PODSUMOWANIE -->
-        <div class="card" style="padding: 20px; background: #e8f5e8; border-radius: 8px; border-left: 5px solid #28a745;">
-            <h3>📊 Podsumowanie</h3>
-            <div style="font-size: 1.2em;">
-                {% set towary_suma = kosztorys.towary|sum(attribute='wartosc') %}
-                {% set uslugi_suma = kosztorys.uslugi|sum(attribute='wartosc') %}
-                <p><strong>Towary:</strong> {{ "%.2f"|format(towary_suma) }} zł</p>
-                <p><strong>Usługi:</strong> {{ "%.2f"|format(uslugi_suma) }} zł</p>
-                <hr>
-                <p style="font-size: 1.4em; font-weight: bold; color: #28a745;">
-                    <strong>RAZEM: {{ "%.2f"|format(kosztorys.kwota_calkowita) }} zł</strong>
-                </p>
-            </div>
-        </div>
     </div>
 </body>
 </html>

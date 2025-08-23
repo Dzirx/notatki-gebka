@@ -3,26 +3,41 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text, func
 from models import Notatka, Samochod, Kosztorys, KosztorysTowar, KosztorysUsluga, Towar, Usluga, Klient
 from typing import List, Dict, Any
+from datetime import datetime, timezone
+from pathlib import Path
 
 # === NOTATKI ===
 def get_wszystkie_notatki(db: Session, skip: int = 0, limit: int = 100):
     """Pobiera wszystkie notatki z informacjami o samochodzie i klientach"""
     return db.query(Notatka).options(
         joinedload(Notatka.samochod).joinedload(Samochod.klient),
-        joinedload(Notatka.kosztorysy)
+        joinedload(Notatka.kosztorysy),
+        joinedload(Notatka.pracownik)
     ).order_by(Notatka.created_at.desc()).offset(skip).limit(limit).all()
 
-def create_notatka_szybka(db: Session, tresc: str):
+def create_notatka_szybka(db: Session, tresc: str, pracownik_id: int = None):
     """Tworzy notatkę ogólną (szybką) - nie przypisaną do konkretnego samochodu"""
-    db_notatka = Notatka(samochod_id=None, typ_notatki="szybka", tresc=tresc, status="nowa")
+    db_notatka = Notatka(
+        samochod_id=None, 
+        typ_notatki="szybka", 
+        tresc=tresc, 
+        status="nowa",
+        pracownik_id=pracownik_id
+    )
     db.add(db_notatka)
     db.commit()
     db.refresh(db_notatka)
     return db_notatka
 
-def create_notatka_samochod(db: Session, samochod_id: int, tresc: str):
+def create_notatka_samochod(db: Session, samochod_id: int, tresc: str, pracownik_id: int = None):
     """Tworzy notatkę przypisaną do konkretnego samochodu"""
-    db_notatka = Notatka(samochod_id=samochod_id, typ_notatki="pojazd", tresc=tresc, status="nowa")
+    db_notatka = Notatka(
+        samochod_id=samochod_id, 
+        typ_notatki="pojazd", 
+        tresc=tresc, 
+        status="nowa",
+        pracownik_id=pracownik_id
+    )
     db.add(db_notatka)
     db.commit()
     db.refresh(db_notatka)
@@ -41,11 +56,36 @@ def update_notatka(db: Session, notatka_id: int, tresc: str):
         return notatka
     return None
 
+def update_notatka_with_employee(db: Session, notatka_id: int, tresc: str, pracownik_id: int = None):
+    """Aktualizuje treść notatki i przypisanego pracownika"""
+    notatka = db.query(Notatka).filter(Notatka.id == notatka_id).first()
+    if notatka:
+        notatka.tresc = tresc
+        notatka.pracownik_id = pracownik_id
+        db.commit()
+        return notatka
+    return None
+
 def delete_notatka(db: Session, notatka_id: int):
     """Usuwa notatkę z bazy danych"""
     try:
-        notatka = db.query(Notatka).filter(Notatka.id == notatka_id).first()
+        # Załaduj notatkę z relacjami żeby cascade zadziałał
+        notatka = db.query(Notatka).options(
+            joinedload(Notatka.kosztorysy),
+            joinedload(Notatka.zalaczniki)
+        ).filter(Notatka.id == notatka_id).first()
+        
         if notatka:
+            # Usuń fizyczne pliki załączników
+            for zalacznik in notatka.zalaczniki:
+                try:
+                    file_path = Path(zalacznik.sciezka)
+                    if file_path.exists():
+                        file_path.unlink()
+                except Exception as file_error:
+                    print(f"Błąd usuwania pliku {zalacznik.sciezka}: {file_error}")
+            
+            # Usuń notatkę (cascade usunie kosztorysy i załączniki z bazy)
             db.delete(notatka)
             db.commit()
             return True
@@ -231,90 +271,75 @@ def create_samochod(db: Session, klient_id: int, nr_rejestracyjny: str,
     print(f"✅ Utworzono nowy samochód: {nr_rejestracyjny} - {marka} {model}")
     return samochod
 
-async def sync_towary_i_uslugi_from_sql(db_pg: Session, db_sql: Session):
-    """Synchronizuje towary i usługi z SQL Server do PostgreSQL (lustrzane odbicie)"""
-    
+async def sync_towary_i_uslugi(db_local: Session, db_src: Session):
+    """
+    Prosta synchronizacja towarów i usług z SQL Server.
+    """
+    print(f"🔍 SYNC DEBUG:")
+    print(f"   db_local URL: {db_local.bind.url}")  # Powinna być TWOJA baza
+    print(f"   db_src URL: {db_src.bind.url}") 
     stats = {
         "towary_dodane": 0,
         "towary_zaktualizowane": 0,
         "uslugi_dodane": 0,
         "uslugi_zaktualizowane": 0
     }
-    
+
     try:
-        # === SYNCHRONIZACJA TOWARÓW ===
-        print("📦 Synchronizuję towary...")
+        # === TOWARY ===
+        print("📦 Towary...")
+        towary_query = text("SELECT id, nazwa, bazowaCenaSprzedazyBrutto AS cena FROM Towary WHERE nazwa IS NOT NULL")
+        towary = db_src.execute(towary_query).fetchall()
         
-        # Pobierz wszystkie towary z SQL Server
-        towary_sql_query = text("SELECT id, nazwa, bazowaCenaSprzedazyBrutto FROM Towary ORDER BY id")
-        result = db_sql.execute(towary_sql_query)
-        towary_sql = result.fetchall()
-        
-        print(f"📋 Znaleziono {len(towary_sql)} towarów w SQL Server")
-        
-        for row in towary_sql:
-            # Sprawdź czy towar istnieje w PostgreSQL
-            existing_towar = db_pg.query(Towar).filter(Towar.id == row.id).first()
+        for row in towary:
+            existing = db_local.query(Towar).filter(Towar.id == row.id).first()
+            cena = float(row.cena) if row.cena else 0.0
             
-            if existing_towar:
-                # Zaktualizuj istniejący towar
-                existing_towar.nazwa = row.nazwa
-                existing_towar.cena = float(row.cena) if row.cena else 0.0
-                existing_towar.updated_at = func.now()
-                stats["towary_zaktualizowane"] += 1
+            if existing:
+                if existing.nazwa != row.nazwa or float(existing.cena or 0) != cena:
+                    existing.nazwa = row.nazwa
+                    existing.cena = cena
+                    stats["towary_zaktualizowane"] += 1
             else:
-                # Utwórz nowy towar z tym samym ID
-                new_towar = Towar(
-                    id=row.id,
-                    nazwa=row.nazwa,
-                    cena=float(row.cena) if row.cena else 0.0
-                )
-                db_pg.add(new_towar)
+                db_local.merge(Towar(id=row.id, nazwa=row.nazwa, cena=cena))
                 stats["towary_dodane"] += 1
+
+        # Flush towarów
+        db_local.flush()
+        print(f"📦 Towary: +{stats['towary_dodane']}, ~{stats['towary_zaktualizowane']}")
+
+        # === USŁUGI ===
+        print("🔧 Usługi...")
+        uslugi_query = text("SELECT id, nazwa, cena FROM Uslugi WHERE nazwa IS NOT NULL")
+        uslugi = db_src.execute(uslugi_query).fetchall()
         
-        # === SYNCHRONIZACJA USŁUG ===
-        print("🔧 Synchronizuję usługi...")
-        
-        # Pobierz wszystkie usługi z SQL Server
-        uslugi_sql_query = text("SELECT id, nazwa, cena FROM Uslugi ORDER BY id")
-        result = db_sql.execute(uslugi_sql_query)
-        uslugi_sql = result.fetchall()
-        
-        print(f"📋 Znaleziono {len(uslugi_sql)} usług w SQL Server")
-        
-        for row in uslugi_sql:
-            # Sprawdź czy usługa istnieje w PostgreSQL
-            existing_usluga = db_pg.query(Usluga).filter(Usluga.id == row.id).first()
+        for row in uslugi:
+            existing = db_local.query(Usluga).filter(Usluga.id == row.id).first()
+            cena = float(row.cena) if row.cena else 0.0
             
-            if existing_usluga:
-                # Zaktualizuj istniejącą usługę
-                existing_usluga.nazwa = row.nazwa
-                existing_usluga.cena = float(row.cena) if row.cena else 0.0
-                existing_usluga.updated_at = func.now()
-                stats["uslugi_zaktualizowane"] += 1
+            if existing:
+                if existing.nazwa != row.nazwa or float(existing.cena or 0) != cena:
+                    existing.nazwa = row.nazwa
+                    existing.cena = cena
+                    stats["uslugi_zaktualizowane"] += 1
             else:
-                # Utwórz nową usługę z tym samym ID
-                new_usluga = Usluga(
-                    id=row.id,
-                    nazwa=row.nazwa,
-                    cena=float(row.cena) if row.cena else 0.0
-                )
-                db_pg.add(new_usluga)
+                db_local.merge(Usluga(id=row.id, nazwa=row.nazwa, cena=cena))
                 stats["uslugi_dodane"] += 1
-        
-        # Zapisz wszystkie zmiany
-        db_pg.commit()
-        
-        print(f"✅ Synchronizacja zakończona:")
-        print(f"   📦 Towary: +{stats['towary_dodane']}, ~{stats['towary_zaktualizowane']}")
-        print(f"   🔧 Usługi: +{stats['uslugi_dodane']}, ~{stats['uslugi_zaktualizowane']}")
+
+        # Flush usług
+        db_local.flush()
+        print(f"🔧 Usługi: +{stats['uslugi_dodane']}, ~{stats['uslugi_zaktualizowane']}")
+
+        # Commit wszystko na końcu
+        db_local.commit()
+        print("✅ Synchronizacja zakończona!")
         
         return stats
-        
+
     except Exception as e:
-        db_pg.rollback()
-        print(f"❌ Błąd synchronizacji: {e}")
-        raise e
+        db_local.rollback()
+        print(f"❌ Błąd: {e}")
+        raise
     
 def get_or_create_towar_by_id(db: Session, towar_id: int, nazwa: str, cena: float):
     """Znajdź towar po ID lub utwórz z tym ID (lustrzane odbicie)"""
@@ -324,22 +349,22 @@ def get_or_create_towar_by_id(db: Session, towar_id: int, nazwa: str, cena: floa
     towar = db.query(Towar).filter(Towar.id == towar_id).first()
     
     if not towar:
-        # Utwórz nowy towar z zadanym ID
+        # Utwórz nowy towar z zadanym ID - UŻYJ MERGE!
         towar = Towar(
             id=towar_id,
             nazwa=nazwa,
             cena=cena
         )
-        db.add(towar)
-        db.commit()
-        db.refresh(towar)
+        towar = db.merge(towar)  # ← ZMIANA: merge zamiast add
+        db.flush()  # Wyślij do bazy bez commit
         print(f"✅ Utworzono towar: {nazwa} (ID: {towar_id})")
     else:
         # Zaktualizuj cenę jeśli się różni
         if float(towar.cena or 0) != cena:
             towar.cena = cena
-            towar.updated_at = func.now()
-            db.commit()
+            # Usuń linię z updated_at jeśli nie masz tego pola w modelu
+            # towar.updated_at = datetime.now(timezone.utc)
+            db.flush()
             print(f"🔄 Zaktualizowano cenę towaru: {nazwa} (ID: {towar_id})")
     
     return towar
@@ -352,22 +377,22 @@ def get_or_create_usluga_by_id(db: Session, usluga_id: int, nazwa: str, cena: fl
     usluga = db.query(Usluga).filter(Usluga.id == usluga_id).first()
     
     if not usluga:
-        # Utwórz nową usługę z zadanym ID
+        # Utwórz nową usługę z zadanym ID - UŻYJ MERGE!
         usluga = Usluga(
             id=usluga_id,
             nazwa=nazwa,
             cena=cena
         )
-        db.add(usluga)
-        db.commit()
-        db.refresh(usluga)
+        usluga = db.merge(usluga)  # ← ZMIANA: merge zamiast add
+        db.flush()  # Wyślij do bazy bez commit
         print(f"✅ Utworzono usługę: {nazwa} (ID: {usluga_id})")
     else:
         # Zaktualizuj cenę jeśli się różni
         if float(usluga.cena or 0) != cena:
             usluga.cena = cena
-            usluga.updated_at = func.now()
-            db.commit()
+            # Usuń linię z updated_at jeśli nie masz tego pola w modelu
+            # usluga.updated_at = datetime.now(timezone.utc)
+            db.flush()
             print(f"🔄 Zaktualizowano cenę usługi: {nazwa} (ID: {usluga_id})")
     
     return usluga
@@ -451,7 +476,7 @@ def update_notatka_status(db: Session, notatka_id: int, new_status: str):
         
         # Aktualizuj status
         notatka.status = new_status
-        notatka.updated_at = datetime.utcnow()  # Jeśli masz pole updated_at
+        notatka.updated_at = datetime.now(timezone.utc) # Jeśli masz pole updated_at
         
         db.commit()
         db.refresh(notatka)

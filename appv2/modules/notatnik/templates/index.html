@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/static/css/components.css">
     <link rel="stylesheet" href="/modules/notatnik/static/css/table.css">
     <link rel="stylesheet" href="/modules/notatnik/static/css/modal.css">
+    <link rel="stylesheet" href="/modules/notatnik/static/css/reminders.css">
 </head>
 <body>
     <div class="container">
@@ -27,7 +28,6 @@
 
         <!-- AKCJE GRUPOWE -->
         <div class="actions-bar">
-            <button class="btn-warning" onclick="editSelected()">✏️ Edytuj zaznaczone</button>
             <button class="btn-danger" onclick="deleteSelected()">🗑️ Usuń zaznaczone</button>
             
             <!-- PRZYCISK FILTRA -->
@@ -36,25 +36,34 @@
             </button>
         </div>
 
+        <!-- PRZYPOMNIENIA NA DZISIAJ -->
+        <div id="todayReminders" class="today-reminders" style="display: none;">
+            <h3>⏰ Przypomnienia na dzisiaj</h3>
+            <div id="todayRemindersList" class="reminder-cards"></div>
+        </div>
+
         <!-- TABELA NOTATEK -->
         <h3>📝 Wszystkie notatki</h3>
-        <table>
+        
+        <table id="notesTable">
             <thead>
                 <tr>
                     <th width="40">
                         <input type="checkbox" id="selectAll" onchange="toggleAllCheckboxes()">
                     </th>
-                    <th>Status</th>
+                    <th width="130">Status</th>
                     <th>Data</th>
                     <th>Właściciel</th>
                     <th>Pojazd</th>
+                    <th>Pracownik</th>
                     <th>Treść</th>
                     <th>Kosztorys</th>
+                    <th>Akcje</th>
                 </tr>
             </thead>
             <tbody>
                 {% for notatka in notatki %}
-                <tr class="notatka-{{ notatka.typ_notatki }}" data-note-id="{{ notatka.id }}" data-nr-rej="{% if notatka.samochod %}{{ notatka.samochod.nr_rejestracyjny }}{% endif %}" data-status="{{ notatka.status|default('nowa') }}">
+                <tr class="notatka-{{ notatka.typ_notatki }}" data-note-id="{{ notatka.id }}" data-nr-rej="{% if notatka.samochod %}{{ notatka.samochod.nr_rejestracyjny }}{% endif %}" data-status="{{ notatka.status|default('nowa') }}" data-search-content="{% for kosztorys in notatka.kosztorysy %}{% for towar_kosztorys in kosztorys.kosztorysy_towary %}{{ towar_kosztorys.towar.nazwa }} {% endfor %}{% for usluga_kosztorys in kosztorys.kosztorysy_uslug %}{{ usluga_kosztorys.usluga.nazwa }} {% endfor %}{% endfor %}">
                 <td>
                         <input type="checkbox" class="note-checkbox" value="{{ notatka.id }}">
                     </td>
@@ -63,10 +72,10 @@
                             <span class="status-badge status-{{ notatka.status|default('nowa') }}" 
                                   onclick="showStatusMenu({{ notatka.id }}, this)"
                                   title="Kliknij aby zmienić status">
-                {% if notatka.status == 'w_trakcie' %}🟡 W trakcie
+                                {% if notatka.status == 'w_trakcie' %}🟡 W trakcie
                                 {% elif notatka.status == 'zakonczona' %}🟢 Zakończona
-                                {% elif notatka.status == 'anulowana' %}🔴 Anulowana
-                                {% elif notatka.status == 'oczekuje' %}🟠 Oczekuje
+                                {% elif notatka.status == 'klient_poinformowany' %}🔴 Klient poinformowany
+                                {% elif notatka.status == 'dostarczony' %}🟠 Dostarczony
                                 {% else %}🔵 Nowa{% endif %}
                             </span>
                             <div class="status-menu" id="statusMenu{{ notatka.id }}" style="display: none;">
@@ -82,34 +91,55 @@
                                      data-status="zakonczona" data-text="Zakonczona" onclick="selectStatusFromMenu({{ notatka.id }}, this)">
                                     🟢 Zakończona
                                 </div>
-                                <div class="status-option {% if notatka.status == 'anulowana' %}current{% endif %}" 
-                                     data-status="anulowana" data-text="Anulowana" onclick="selectStatusFromMenu({{ notatka.id }}, this)">
-                                    🔴 Anulowana
+                                <div class="status-option {% if notatka.status == 'dostarczony' %}current{% endif %}" 
+                                     data-status="dostarczony" data-text="Dostarczony" onclick="selectStatusFromMenu({{ notatka.id }}, this)">
+                                    🟠 Dostarczony
                                 </div>
-                                <div class="status-option {% if notatka.status == 'oczekuje' %}current{% endif %}" 
-                                     data-status="oczekuje" data-text="Oczekuje" onclick="selectStatusFromMenu({{ notatka.id }}, this)">
-                                    🟠 Oczekuje
+                                <div class="status-option {% if notatka.status == 'klient_poinformowany' %}current{% endif %}" 
+                                     data-status="klient_poinformowany" data-text="Klient poinformowany" onclick="selectStatusFromMenu({{ notatka.id }}, this)">
+                                    🔴 Klient poinformowany
                                 </div>
                             </div>
                         </div>
                     </td>
-                    <td>{{ notatka.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
                     <td>
-                        {% if notatka.samochod and notatka.samochod.klient %}
-                            {{ notatka.samochod.klient.nazwapelna }}
-                        {% else %}
-                            Szybka notatka
-                        {% endif %}
+                        <a href="/notatnik/kosztorys/{{ notatka.id }}" style="color: inherit; text-decoration: none;">
+                            {{ notatka.created_at.strftime('%d.%m.%Y %H:%M') }}
+                        </a>
                     </td>
                     <td>
-                        {% if notatka.samochod %}
-                            {{ notatka.samochod.nr_rejestracyjny }}
-                            <br><small>{{ notatka.samochod.marka }} {{ notatka.samochod.model }}</small>
-                        {% else %}
-                            -
-                        {% endif %}
+                        <a href="/notatnik/kosztorys/{{ notatka.id }}" style="color: inherit; text-decoration: none;">
+                            {% if notatka.samochod and notatka.samochod.klient %}
+                                {{ notatka.samochod.klient.nazwapelna }}
+                            {% else %}
+                                Szybka notatka
+                            {% endif %}
+                        </a>
                     </td>
-                    <td class="note-content">{{ notatka.tresc }}</td>
+                    <td>
+                        <a href="/notatnik/kosztorys/{{ notatka.id }}" style="color: inherit; text-decoration: none;">
+                            {% if notatka.samochod %}
+                                {{ notatka.samochod.nr_rejestracyjny }}
+                                <br><small>{{ notatka.samochod.marka }} {{ notatka.samochod.model }}</small>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </a>
+                    </td>
+                    <td>
+                        <a href="/notatnik/kosztorys/{{ notatka.id }}" style="color: inherit; text-decoration: none;">
+                            {% if notatka.pracownik %}
+                                {{ notatka.pracownik.imie }} {{ notatka.pracownik.nazwisko }}
+                            {% else %}
+                                <span style="color: #888;">Nie przypisano</span>
+                            {% endif %}
+                        </a>
+                    </td>
+                    <td class="note-content">
+                        <a href="/notatnik/kosztorys/{{ notatka.id }}" style="color: inherit; text-decoration: none;">
+                            {{ notatka.tresc }}
+                        </a>
+                    </td>
                     <td>
                         {% if notatka.kosztorysy %}
                             {% for kosztorys in notatka.kosztorysy %}
@@ -121,19 +151,52 @@
                             -
                         {% endif %}
                     </td>
+                    <td>
+                        <div style="display: flex; gap: 5px; align-items: center;">
+                            <button class="btn-small btn-warning" onclick="openEditModal({{ notatka.id }})" title="Edytuj notatkę">
+                                Edytuj
+                            </button>
+                            <button class="btn-small btn-secondary" onclick="openDetailsModal({{ notatka.id }})" title="Dodatkowe informacje">
+                                ⬜
+                            </button>
+                        </div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
 
+        <!-- PROSTA PAGINACJA -->
+        <div class="pagination-wrapper">
+            <div class="pagination-controls">
+                <label for="itemsPerPage">Pokaż:</label>
+                <select id="itemsPerPage" onchange="changeItemsPerPage()">
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+                <span>na stronę </span>
+            </div>
+            <div class="pagination">
+                <button id="prevPage" onclick="goToPreviousPage()" title="Poprzednia strona"> ⏪</button>
+                <div id="pageNumbers"></div>
+                <button id="nextPage" onclick="goToNextPage()" title="Następna strona">⏩</button>
+            </div>
+        </div>
+
         <!-- MODALE -->
         {% include 'modals/add_note_modal.html' %}
         {% include 'modals/edit_note_modal.html' %}
+        {% include 'modals/details_note_modal.html' %}
     </div>
 
     <script src="/modules/notatnik/static/js/note-core.js"></script>
-    <script src="/modules/notatnik/static/js/note-add.js"></script>  
+    <script src="/modules/notatnik/static/js/note-add.js"></script>
+    <script src="/modules/notatnik/static/js/towar-search.js"></script>
+    <script src="/modules/notatnik/static/js/usluga-search.js"></script>  
     <script src="/modules/notatnik/static/js/note-edit.js"></script>
+    <script src="/modules/notatnik/static/js/note-details.js"></script>
+    <script src="/modules/notatnik/static/js/pagination.js"></script>
     <script src="/modules/notatnik/static/js/note.js"></script>
 </body>
 </html>

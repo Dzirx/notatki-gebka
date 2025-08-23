@@ -6,13 +6,17 @@
     <link rel="stylesheet" href="/static/css/base.css">
     <link rel="stylesheet" href="/static/css/components.css">
     <link rel="stylesheet" href="/modules/notatnik/static/css/table.css">
+    <link rel="stylesheet" href="/modules/notatnik/static/css/print.css" media="print">
 </head>
 <body>
     <div class="container">
         <!-- HEADER -->
         <div class="header">
             <h1>💰 Kosztorysy dla Notatki #{{ notatka.id }}</h1>
-            <div>
+            <div class="no-print">
+                <button onclick="printPage()" class="btn-primary" style="margin-right: 10px;">
+                    🖨️ Drukuj
+                </button>
                 <a href="/notatnik" class="btn-secondary">← Powrót do notatek</a>
             </div>
         </div>
@@ -27,6 +31,24 @@
                 <p><strong>Pojazd:</strong> {{ notatka.samochod.nr_rejestracyjny }} - {{ notatka.samochod.marka }} {{ notatka.samochod.model }}</p>
                 {% if notatka.samochod.klient %}
                     <p><strong>Właściciel:</strong> {{ notatka.samochod.klient.nazwapelna }}</p>
+                {% endif %}
+            {% endif %}
+            
+            <!-- DODATKOWE INFORMACJE DOSTAWA -->
+            {% if notatka.data_dostawy or notatka.dostawca or notatka.nr_vat_dot or notatka.miejsce_prod %}
+                <hr style="margin: 15px 0; border: 1px solid #ddd;">
+                <h4>📦 Informacje o dostawie</h4>
+                {% if notatka.data_dostawy %}
+                    <p><strong>Data dostawy:</strong> {{ notatka.data_dostawy.strftime('%d.%m.%Y %H:%M') }}</p>
+                {% endif %}
+                {% if notatka.dostawca %}
+                    <p><strong>Dostawca:</strong> {{ notatka.dostawca }}</p>
+                {% endif %}
+                {% if notatka.nr_vat_dot %}
+                    <p><strong>Nr VAT DOT:</strong> {{ notatka.nr_vat_dot }}</p>
+                {% endif %}
+                {% if notatka.miejsce_prod %}
+                    <p><strong>Miejsce produkcji:</strong> {{ notatka.miejsce_prod }}</p>
                 {% endif %}
             {% endif %}
         </div>
@@ -113,5 +135,7 @@
             </div>
         {% endif %}
     </div>
+
+    <script src="/modules/notatnik/static/js/print-utils.js"></script>
 </body>
 </html>

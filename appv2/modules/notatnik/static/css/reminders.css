@@ -1,0 +1,111 @@
+/* CSS dla sekcji przypomnień */
+.today-reminders {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.today-reminders h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #495057;
+    border-bottom: 2px solid #28a745;
+    padding-bottom: 8px;
+}
+
+.reminder-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 12px;
+}
+
+.reminder-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-left: 3px solid #28a745;
+    border-radius: 6px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    max-height: 140px;
+    overflow: hidden;
+}
+
+.reminder-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    border-left-color: #20c997;
+}
+
+.reminder-time {
+    font-weight: bold;
+    color: #28a745;
+    margin-bottom: 4px;
+    font-size: 12px;
+}
+
+.reminder-vehicle {
+    font-weight: 500;
+    color: #495057;
+    margin-bottom: 3px;
+    font-size: 13px;
+}
+
+.reminder-client {
+    color: #6c757d;
+    font-size: 11px;
+    margin-bottom: 4px;
+}
+
+.reminder-content {
+    color: #495057;
+    font-size: 12px;
+    margin-bottom: 8px;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.reminder-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.reminder-actions .btn {
+    font-size: 10px;
+    padding: 3px 6px;
+    line-height: 1.2;
+}
+
+/* Podświetlenie notatki */
+.highlighted-note {
+    background-color: #fff3cd !important;
+    border-left: 4px solid #ffc107 !important;
+    animation: highlight-pulse 0.5s ease-in-out;
+}
+
+@keyframes highlight-pulse {
+    0% { background-color: #fff3cd; }
+    50% { background-color: #ffeaa7; }
+    100% { background-color: #fff3cd; }
+}
+
+/* Responsywność */
+@media (max-width: 768px) {
+    .reminder-cards {
+        grid-template-columns: 1fr;
+    }
+    
+    .reminder-actions {
+        justify-content: center;
+        margin-top: 10px;
+    }
+}

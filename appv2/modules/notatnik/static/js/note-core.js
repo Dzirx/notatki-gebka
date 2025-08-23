@@ -2,7 +2,7 @@
 // Podstawowe funkcje notatnika
 
 console.log('📝 Moduł note-core załadowany');
-let showingCompleted = false;
+window.showingCompleted = false;
 
 // MODALE - podstawowe funkcje
 function openModal() {
@@ -41,36 +41,67 @@ function filterNotatkiByRej() {
     const filter = document.getElementById('searchRejInput').value.toUpperCase();
     const rows = document.querySelectorAll('tbody tr');
     
+    // RESET BEZPIECZEŃSTWA - usuń wszystkie style display z wierszy
     rows.forEach(row => {
-        // Pobierz numer rejestracyjny
-        const nrRej = (row.getAttribute('data-nr-rej') || '').toUpperCase();
-        
-        // Pobierz treść notatki z komórki
-        const trescCell = row.querySelector('.note-content');
-        const tresc = trescCell ? trescCell.textContent.toUpperCase() : '';
-        
-        // Pokaż wiersz jeśli filter pasuje do numeru rej. LUB treści
-        const pokazWiersz = nrRej.includes(filter) || tresc.includes(filter);
-        row.style.display = pokazWiersz ? '' : 'none';
+        row.style.display = '';
+        row.removeAttribute('style');
     });
     
-    // Pokaż ile znaleziono
-    const visibleRows = document.querySelectorAll('tbody tr[style=""], tbody tr:not([style])').length;
-    const totalRows = document.querySelectorAll('tbody tr').length;
+    let visibleCount = 0;
     
-    // Dodaj/zaktualizuj info o wyszukiwaniu
+    rows.forEach(row => {
+        const rowStatus = row.getAttribute('data-status') || 'nowa';
+        
+        // Sprawdź czy wiersz pasuje do wyszukiwania
+        let matchesSearch = true;
+        
+        if (filter.length > 0) {
+            const nrRej = (row.getAttribute('data-nr-rej') || '').toUpperCase();
+            const trescCell = row.querySelector('.note-content');
+            const tresc = trescCell ? trescCell.textContent.toUpperCase() : '';
+            const searchContent = (row.getAttribute('data-search-content') || '').toUpperCase();
+            
+            matchesSearch = nrRej.includes(filter) || 
+                           tresc.includes(filter) || 
+                           searchContent.includes(filter);
+        }
+        
+        // Sprawdź czy wiersz pasuje do filtru statusu
+        let matchesStatusFilter = true;
+        
+        if (window.showingCompleted) {
+            // Pokazuj TYLKO zakończone
+            matchesStatusFilter = (rowStatus === 'zakonczona');
+        } else {
+            // Pokazuj wszystkie OPRÓCZ zakończonych
+            matchesStatusFilter = (rowStatus !== 'zakonczona');
+        }
+        
+        // Ostateczna decyzja - wiersz jest widoczny tylko gdy pasuje do OBU filtrów
+        const shouldShow = matchesSearch && matchesStatusFilter;
+        
+        if (shouldShow) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // Aktualizuj licznik
+    updateSearchInfo(filter, visibleCount, rows.length);
+}
+
+function updateSearchInfo(filter, visibleCount, totalCount) {
     let searchInfo = document.getElementById('search-info');
     if (!searchInfo) {
         searchInfo = document.createElement('div');
         searchInfo.id = 'search-info';
         searchInfo.style.cssText = 'margin-top: 10px; color: #6c757d; font-size: 14px;';
-        document.querySelector('.search-rej').appendChild(searchInfo);
-    }
-    
-    if (filter) {
-        searchInfo.textContent = `Znaleziono: ${visibleRows} z ${totalRows} notatek`;
-    } else {
-        searchInfo.textContent = '';
+        const searchContainer = document.querySelector('.search-rej');
+        if (searchContainer) {
+            searchContainer.appendChild(searchInfo);
+        }
     }
 }
 
@@ -180,35 +211,8 @@ async function syncTowary() {
 
 // AUTO-WYPEŁNIANIE CEN (wspólne dla obu modali)
 document.addEventListener('change', function(e) {
-    // Dla modala dodawania
-    if (e.target.id === 'selectTowar') {
-        const selectedTowar = window.towaryData?.find(t => t.id == e.target.value);
-        if (selectedTowar) {
-            document.getElementById('towarCena').value = parseFloat(selectedTowar.cena).toFixed(2);
-        }
-    }
-    
-    if (e.target.id === 'selectUsluga') {
-        const selectedUsluga = window.uslugiData?.find(u => u.id == e.target.value);
-        if (selectedUsluga) {
-            document.getElementById('uslugaCena').value = parseFloat(selectedUsluga.cena).toFixed(2);
-        }
-    }
-    
-    // Dla modala edycji
-    if (e.target.id === 'editSelectTowar') {
-        const selectedTowar = window.editTowaryData?.find(t => t.id == e.target.value);
-        if (selectedTowar) {
-            document.getElementById('editTowarCena').value = parseFloat(selectedTowar.cena).toFixed(2);
-        }
-    }
-    
-    if (e.target.id === 'editSelectUsluga') {
-        const selectedUsluga = window.editUslugiData?.find(u => u.id == e.target.value);
-        if (selectedUsluga) {
-            document.getElementById('editUslugaCena').value = parseFloat(selectedUsluga.cena).toFixed(2);
-        }
-    }
+    // selectTowar i selectUsluga zastąpione wyszukiwarkami - auto-wypełnianie w towar-search.js i usluga-search.js
+    // editSelectTowar i editSelectUsluga zastąpione wyszukiwarkami - auto-wypełnianie w towar-search.js i usluga-search.js
 });
 
 // FUNKCJE POMOCNICZE
@@ -234,35 +238,22 @@ function showError(elementId, message) {
     }
 }
 
-// ZAMYKANIE MODALI PRZY KLIKNIĘCIU W TŁO
-window.addEventListener('click', function(e) {
-    const noteModal = document.getElementById('noteModal');
-    const editModal = document.getElementById('editModal');
-    
-    if (e.target === noteModal) {
-        closeModal();
-    }
-    
-    if (e.target === editModal) {
-        closeEditModal();
-    }
-});
-
-// SKRÓTY KLAWISZOWE
+// SKRÓTY KLAWISZOWE - ESC WYŁĄCZONY
+// Modale zamykają się tylko przez przyciski ❌ i "Anuluj"
 document.addEventListener('keydown', function(e) {
-    // ESC - zamknij modiale
-    if (e.key === 'Escape') {
-        const noteModal = document.getElementById('noteModal');
-        const editModal = document.getElementById('editModal');
-        
-        if (noteModal && noteModal.style.display === 'block') {
-            closeModal();
-        }
-        
-        if (editModal && editModal.style.display === 'block') {
-            closeEditModal();
-        }
-    }
+    // ESC - zamknij modiale - WYŁĄCZONE
+    // if (e.key === 'Escape') {
+    //     const noteModal = document.getElementById('noteModal');
+    //     const editModal = document.getElementById('editModal');
+    //     
+    //     if (noteModal && noteModal.style.display === 'block') {
+    //         closeModal();
+    //     }
+    //     
+    //     if (editModal && editModal.style.display === 'block') {
+    //         closeEditModal();
+    //     }
+    // }
     
     // Ctrl+N - nowa notatka
     if (e.ctrlKey && e.key === 'n') {
@@ -319,10 +310,13 @@ function selectStatusFromMenu(noteId, optionElement) {
         'w_trakcie': '🟡',
         'zakonczona': '🟢',
         'anulowana': '🔴',
-        'oczekuje': '🟠'
+        'oczekuje': '🟠',
+        'dostarczony': '🟠',
+        'klient_poinformowany': '🔴'
     };
     
-    const fullStatusText = `${statusEmojis[status]} ${statusText}`;
+    const emoji = statusEmojis[status] || '❓'; // Fallback emoji jeśli status nie istnieje
+    const fullStatusText = `${emoji} ${statusText}`;
     selectStatus(noteId, status, fullStatusText);
 }
 
@@ -444,27 +438,23 @@ function showToast(message, type = 'info') {
 
 function toggleCompletedNotes() {
     const btn = document.getElementById('toggleCompletedBtn');
-    const table = document.querySelector('table');
     
-    showingCompleted = !showingCompleted;
+    window.showingCompleted = !window.showingCompleted;
     
-    if (showingCompleted) {
-        // Pokaż TYLKO zakończone
-        table.classList.add('only-completed');
+    if (window.showingCompleted) {
+        // Tryb: Pokazuj TYLKO zakończone
         btn.textContent = '📋 Wszystkie notatki';
         btn.classList.add('active');
     } else {
-        // Pokaż wszystkie OPRÓCZ zakończonych
-        table.classList.remove('only-completed');
+        // Tryb: Pokazuj wszystkie OPRÓCZ zakończonych
         btn.textContent = '✅ Tylko zakończone';
         btn.classList.remove('active');
     }
     
-    // Usuń licznik - nie potrzebny
-    const counter = document.getElementById('notes-counter');
-    if (counter) {
-        counter.remove();
-    }
+    // KLUCZOWA POPRAWKA: Uruchom filtrowanie po zmianie stanu
+    filterNotatkiByRej();
+    
+    console.log(`🔄 Przełączono na: ${window.showingCompleted ? 'tylko zakończone' : 'wszystkie oprócz zakończonych'}`);
 }
 
 function updateNotesCounter() {
@@ -480,7 +470,7 @@ function updateNotesCounter() {
         document.querySelector('.actions-bar').appendChild(counter);
     }
     
-    if (showingCompleted) {
+    if (window.showingCompleted) {
         counter.textContent = `📊 Widoczne: ${visibleNotes}/${totalNotes} notatek`;
     } else {
         const completedCount = totalNotes - visibleNotes;
@@ -500,6 +490,104 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+    
+    // Uruchom filtrowanie na starcie (ukryje zakończone notatki)
+    filterNotatkiByRej();
+    
+    // Załaduj dzisiejsze przypomnienia przy starcie strony
+    loadTodayReminders();
 });
+
+// === FUNKCJE PRZYPOMNIEŃ ===
+
+async function loadTodayReminders() {
+    try {
+        const response = await fetch('/api/przypomnienia/dzisiaj');
+        const data = await response.json();
+        
+        const reminderSection = document.getElementById('todayReminders');
+        const remindersList = document.getElementById('todayRemindersList');
+        
+        if (data.notatki && data.notatki.length > 0) {
+            // Pokaż sekcję
+            reminderSection.style.display = 'block';
+            
+            // Stwórz karty przypomnień
+            remindersList.innerHTML = data.notatki.map(notatka => {
+                const date = new Date(notatka.data_przypomnienia);
+                const timeStr = date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+                
+                const pojazd = notatka.samochod ? 
+                    `<strong>${notatka.samochod.nr_rejestracyjny}</strong> ${notatka.samochod.marka} ${notatka.samochod.model}` : 
+                    'Szybka notatka';
+                
+                const klient = notatka.samochod && notatka.samochod.klient ? 
+                    `👤 ${notatka.samochod.klient.nazwapelna}` : '';
+                
+                return `
+                    <div class="reminder-card" onclick="highlightNote(${notatka.id})">
+                        <div class="reminder-time">⏰ ${timeStr}</div>
+                        <div class="reminder-vehicle">${pojazd}</div>
+                        <div class="reminder-client">${klient}</div>
+                        <div class="reminder-content">${notatka.tresc}</div>
+                        <div class="reminder-actions">
+                            <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); markReminderDone(${notatka.przypomnienie_id})">✅ Wykonane</button>
+                            <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openEditModal(${notatka.id})">✏️ Edytuj</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+        } else {
+            // Ukryj sekcję jeśli brak przypomnień
+            reminderSection.style.display = 'none';
+        }
+        
+    } catch (error) {
+        console.error('Błąd ładowania dzisiejszych przypomnień:', error);
+    }
+}
+
+function highlightNote(noteId) {
+    // Znajdź wiersz notatki i podświetl go
+    const row = document.querySelector(`tr[data-note-id="${noteId}"]`);
+    if (row) {
+        // Usuń poprzednie podświetlenia
+        document.querySelectorAll('.highlighted-note').forEach(el => {
+            el.classList.remove('highlighted-note');
+        });
+        
+        // Dodaj podświetlenie
+        row.classList.add('highlighted-note');
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Usuń podświetlenie po 3 sekundach
+        setTimeout(() => {
+            row.classList.remove('highlighted-note');
+        }, 3000);
+    }
+}
+
+async function markReminderDone(reminderId) {
+    if (!confirm('Czy chcesz oznaczyć to przypomnienie jako wykonane?')) return;
+    
+    try {
+        const response = await fetch(`/api/przypomnienie/${reminderId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showToast('Przypomnienie zostało oznaczone jako wykonane', 'success');
+            await loadTodayReminders(); // Odśwież listę przypomnień
+        } else {
+            const result = await response.json();
+            showToast(result.detail || 'Błąd oznaczania przypomnienia', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Błąd oznaczania przypomnienia:', error);
+        showToast('Błąd oznaczania przypomnienia', 'error');
+    }
+}
 
 console.log('✅ Filtr zakończonych notatek załadowany');

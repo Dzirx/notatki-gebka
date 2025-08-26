@@ -321,8 +321,15 @@ function selectStatusFromMenu(noteId, optionElement) {
 }
 
 async function selectStatus(noteId, status, statusText) {
-    // Znajdź badge i menu - poprawiony selektor
-    const badge = document.querySelector(`[onclick*="showStatusMenu(${noteId}"]`);
+    // Znajdź wiersz notatki - bardziej precyzyjny sposób
+    const noteRow = document.querySelector(`tr[data-note-id="${noteId}"]`);
+    if (!noteRow) {
+        console.error(`❌ Nie znaleziono wiersza dla notatki ${noteId}`);
+        return;
+    }
+    
+    // Znajdź badge w tym konkretnym wierszu
+    const badge = noteRow.querySelector('.status-badge');
     const menu = document.getElementById(`statusMenu${noteId}`);
     
     // Sprawdź czy elementy zostały znalezione
@@ -355,6 +362,9 @@ async function selectStatus(noteId, status, statusText) {
         // Aktualizuj badge
         badge.textContent = statusText;
         badge.className = `status-badge status-${status}`;
+        
+        // KLUCZOWA POPRAWKA: Aktualizuj data-status wiersza
+        noteRow.setAttribute('data-status', status);
         
         // Aktualizuj menu - zaznacz aktualny status
         menu.querySelectorAll('.status-option').forEach(option => {

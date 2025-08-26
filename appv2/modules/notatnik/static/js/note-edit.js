@@ -7,11 +7,10 @@ console.log('📝 Moduł note-edit załadowany');
 window.currentEditNoteId = null;
 window.editSelectedTowary = [];
 window.editSelectedUslugi = [];
-window.editTowaryData = [];
-window.editUslugiData = [];
 window.editExistingCosts = [];
 window.editNoteData = null;
 window.editIntegraKosztorysy = [];
+// editTowaryData i editUslugiData usunięte - używamy wyszukiwarek
 
 // OTWIERANIE MODALA EDYCJI
 async function openEditModal(noteId) {
@@ -77,23 +76,17 @@ async function openEditModal(noteId) {
     }
 }
 
-// ŁADOWANIE DANYCH DO DROPDOWNÓW (EDYCJA)
+// ŁADOWANIE DANYCH PRACOWNIKÓW (EDYCJA)
 async function loadEditDropdownData() {
     try {
-        const [towaryResponse, uslugiResponse, pracownicyResponse] = await Promise.all([
-            fetch('/api/towary'),
-            fetch('/api/uslugi'),
-            fetch('/api/pracownicy')
-        ]);
-        
-        window.editTowaryData = await towaryResponse.json();
-        window.editUslugiData = await uslugiResponse.json();
+        // Tylko pracownicy - towary i usługi używają wyszukiwarek
+        const pracownicyResponse = await fetch('/api/pracownicy');
         window.editPracownicyData = await pracownicyResponse.json();
         
         populateEditSelects();
         
     } catch (error) {
-        console.error('Błąd ładowania danych:', error);
+        console.error('Błąd ładowania danych pracowników:', error);
     }
 }
 
@@ -200,19 +193,31 @@ function addTowarToEditCost() {
 
 function addCustomTowarToEditCost() {
     const nazwaInput = document.getElementById('editCustomTowarNazwa');
+    const numerInput = document.getElementById('editCustomTowarNumer');
+    const producentInput = document.getElementById('editCustomTowarProducent');
+    const rodzajSelect = document.getElementById('editCustomTowarRodzaj');
+    const typSelect = document.getElementById('editCustomTowarTyp');
+    const indeksInput = document.getElementById('editCustomTowarIndeks');
     const iloscInput = document.getElementById('editCustomTowarIlosc');
     const cenaInput = document.getElementById('editCustomTowarCena');
     
     if (!nazwaInput.value || !iloscInput.value || !cenaInput.value) {
-        alert('Wypełnij wszystkie pola');
+        alert('Wypełnij wszystkie pola obowiązkowe (nazwa, ilość, cena)');
         return;
     }
     
     const newItem = {
         id: null,
         nazwa: nazwaInput.value,
+        numer_katalogowy: numerInput.value || null,
+        nazwa_producenta: producentInput.value || null,
+        rodzaj_opony: rodzajSelect.value || null,
+        typ_opony: typSelect.value || null,
+        opona_indeks_nosnosci: indeksInput.value || null,
         ilosc: parseFloat(iloscInput.value),
         cena: parseFloat(cenaInput.value),
+        zrodlo: 'local',
+        external_id: null,
         isCustom: true
     };
     
@@ -220,6 +225,11 @@ function addCustomTowarToEditCost() {
     
     // Reset pól
     nazwaInput.value = '';
+    numerInput.value = '';
+    producentInput.value = '';
+    rodzajSelect.value = '';
+    typSelect.value = '';
+    indeksInput.value = '';
     iloscInput.value = '';
     cenaInput.value = '';
     
@@ -276,6 +286,8 @@ function addCustomUslugaToEditCost() {
         nazwa: nazwaInput.value,
         ilosc: parseFloat(iloscInput.value),
         cena: parseFloat(cenaInput.value),
+        zrodlo: 'local',
+        external_id: null,
         isCustom: true
     };
     
@@ -304,7 +316,7 @@ function renderEditSelectedTowary() {
     container.innerHTML = window.editSelectedTowary.map((item, index) => `
         <div class="edit-cost-item">
             <div class="item-info">
-                <strong>${item.nazwa}</strong> ${item.isCustom ? '<span style="color: #007bff;">(własny)</span>' : ''}<br>
+                <strong>${item.nazwa}</strong>${item.numer_katalogowy ? ` <span style="color: #666; font-size: 0.9em;">${item.numer_katalogowy}</span>` : ''}<br>
                 <small>Ilość: ${item.ilosc} × ${item.cena.toFixed(2)} zł = <strong>${(item.ilosc * item.cena).toFixed(2)} zł</strong></small>
             </div>
             <div class="item-actions">
@@ -331,7 +343,7 @@ function renderEditSelectedUslugi() {
     container.innerHTML = window.editSelectedUslugi.map((item, index) => `
         <div class="edit-cost-item">
             <div class="item-info">
-                <strong>${item.nazwa}</strong> ${item.isCustom ? '<span style="color: #007bff;">(własna)</span>' : ''}<br>
+                <strong>${item.nazwa}</strong><br>
                 <small>Ilość: ${item.ilosc} × ${item.cena.toFixed(2)} zł = <strong>${(item.ilosc * item.cena).toFixed(2)} zł</strong></small>
             </div>
             <div class="item-actions">
@@ -601,11 +613,10 @@ function resetEditModal() {
     window.currentEditNoteId = null;
     window.editSelectedTowary = [];
     window.editSelectedUslugi = [];
-    window.editTowaryData = [];
-    window.editUslugiData = [];
     window.editExistingCosts = [];
     window.editNoteData = null;
     window.editIntegraKosztorysy = [];
+    // editTowaryData i editUslugiData już nie istnieją
     
     // Reset pól formularza
     const editTresc = document.getElementById('edit_tresc');
@@ -615,6 +626,25 @@ function resetEditModal() {
     if (editTresc) editTresc.value = '';
     if (editNewCostNumber) editNewCostNumber.value = '';
     if (editNewCostDescription) editNewCostDescription.value = '';
+    
+    // Reset pól dodawania własnych towarów w edycji
+    const editCustomTowarNazwa = document.getElementById('editCustomTowarNazwa');
+    const editCustomTowarNumer = document.getElementById('editCustomTowarNumer');
+    const editCustomTowarProducent = document.getElementById('editCustomTowarProducent');
+    const editCustomTowarRodzaj = document.getElementById('editCustomTowarRodzaj');
+    const editCustomTowarTyp = document.getElementById('editCustomTowarTyp');
+    const editCustomTowarIndeks = document.getElementById('editCustomTowarIndeks');
+    const editCustomTowarIlosc = document.getElementById('editCustomTowarIlosc');
+    const editCustomTowarCena = document.getElementById('editCustomTowarCena');
+    
+    if (editCustomTowarNazwa) editCustomTowarNazwa.value = '';
+    if (editCustomTowarNumer) editCustomTowarNumer.value = '';
+    if (editCustomTowarProducent) editCustomTowarProducent.value = '';
+    if (editCustomTowarRodzaj) editCustomTowarRodzaj.value = '';
+    if (editCustomTowarTyp) editCustomTowarTyp.value = '';
+    if (editCustomTowarIndeks) editCustomTowarIndeks.value = '';
+    if (editCustomTowarIlosc) editCustomTowarIlosc.value = '';
+    if (editCustomTowarCena) editCustomTowarCena.value = '';
     
     // Reset wyświetlanych kontenerów
     const editSelectedTowary = document.getElementById('editSelectedTowary');

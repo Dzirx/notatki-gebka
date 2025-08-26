@@ -104,15 +104,26 @@ def search_towary_api(
         )
     ).limit(limit).all()
     
+    # Sortuj: Integra na górze, potem własne
+    towary_sorted = sorted(towary, key=lambda t: (t.zrodlo != 'integra', t.nazwa))
+    
     return [
         {
             "id": t.id,
             "nazwa": t.nazwa,
             "numer_katalogowy": t.numer_katalogowy,
             "cena": float(t.cena) if t.cena else 0.0,
-            "display": f"{t.numer_katalogowy or 'N/A'} - {t.nazwa}"
+            "nazwa_producenta": t.nazwa_producenta,
+            "opona_indeks_nosnosci": t.opona_indeks_nosnosci,
+            "rodzaj_opony": t.rodzaj_opony,
+            "typ_opony": t.typ_opony,
+            "zrodlo": t.zrodlo,
+            "external_id": t.external_id,
+            "display": f"{t.numer_katalogowy or 'N/A'} - {t.nazwa} {'[INTEGRA]' if t.zrodlo == 'integra' else '[WŁASNY]'}" + 
+                     (f" - {t.nazwa_producenta}" if t.nazwa_producenta else "") +
+                     (f" {t.rodzaj_opony}/{t.typ_opony}" if t.rodzaj_opony and t.typ_opony else "")
         }
-        for t in towary
+        for t in towary_sorted
     ]
 
 @router.get("/uslugi/search")
@@ -129,27 +140,37 @@ def search_uslugi_api(
         Usluga.nazwa.ilike(f"%{q}%")
     ).limit(limit).all()
     
+    # Sortuj: Integra na górze, potem własne
+    uslugi_sorted = sorted(uslugi, key=lambda u: (u.zrodlo != 'integra', u.nazwa))
+    
     return [
         {
             "id": u.id,
             "nazwa": u.nazwa,
             "cena": float(u.cena) if u.cena else 0.0,
-            "display": f"{u.nazwa}"
+            "zrodlo": u.zrodlo,
+            "external_id": u.external_id,
+            "display": f"{u.nazwa} {'[INTEGRA]' if u.zrodlo == 'integra' else '[WŁASNY]'}"
         }
-        for u in uslugi
+        for u in uslugi_sorted
     ]
 
 @router.get("/uslugi")
 def get_uslugi_api(db: Session = Depends(get_db)):
     """Lista wszystkich usług"""
     uslugi = crud.get_uslugi(db)
+    # Sortuj: Integra na górze, potem własne
+    uslugi_sorted = sorted(uslugi, key=lambda u: (u.zrodlo != 'integra', u.nazwa))
+    
     return [
         {
             "id": u.id,
             "nazwa": u.nazwa,
-            "cena": float(u.cena) if u.cena else 0.0
+            "cena": float(u.cena) if u.cena else 0.0,
+            "zrodlo": u.zrodlo,
+            "external_id": u.external_id
         }
-        for u in uslugi
+        for u in uslugi_sorted
     ]
 
 @router.get("/pracownicy")
@@ -167,7 +188,11 @@ def get_pracownicy_api(db: Session = Depends(get_db)):
     ]
 
 @router.get("/kosztorysy-zewnetrzne/{nr_rejestracyjny}")
-def get_kosztorysy_zewnetrzne(nr_rejestracyjny: str, db_sql: Session = Depends(get_samochody_db)):
+def get_kosztorysy_zewnetrzne(
+    nr_rejestracyjny: str,
+    db: Session = Depends(get_db),
+    db_sql: Session = Depends(get_samochody_db)
+):
     """Pobiera kosztorysy z Microsoft SQL Server (baza integra)"""
     
     if db_sql is None:
@@ -180,6 +205,8 @@ def get_kosztorysy_zewnetrzne(nr_rejestracyjny: str, db_sql: Session = Depends(g
             ko.nazwaPelna as nazwa_klienta, 
             ko.telefon1 as telefon, 
             ko.nip as nip, 
+            ko.email as email,
+            ko.nazwaPelnaLista as nazwa_firmy,
             k.numer as numer_kosztorysu, 
             mp.nazwa as model, 
             mk.nazwa as marka, 
@@ -274,6 +301,7 @@ def get_kosztorysy_zewnetrzne(nr_rejestracyjny: str, db_sql: Session = Depends(g
                 "numer_kosztorysu": row.numer_kosztorysu,
                 "nazwa_klienta": row.nazwa_klienta,
                 "telefon": row.telefon,
+                "email": row.email,
                 "nip": row.nip,
                 "pojazd": {
                     "marka": row.marka,
@@ -286,6 +314,56 @@ def get_kosztorysy_zewnetrzne(nr_rejestracyjny: str, db_sql: Session = Depends(g
                 "uslugi": uslugi_parsed   # ← STRUKTURALNE DANE
             })
         
+        # === AUTOMATYCZNA SYNCHRONIZACJA POJAZDU Z INTEGRA ===
+        sync_result = None
+        if kosztorysy:
+            try:
+                # Użyj funkcji z CRUD do synchronizacji (bez nadpisywania - pokaż dialog przy konflikcie)
+                sync_result = crud.sync_vehicle_from_integra(db, kosztorysy[0], overwrite=False)
+                print(f"🚗 Sync result: {sync_result}")
+                
+                # Jeśli jest konflikt właściciela - zwróć info o konflikcie z porównaniem danych
+                if not sync_result.get("success") and sync_result.get("conflict"):
+                    # Pobierz lokalne dane pojazdu do porównania
+                    from models import Samochod
+                    local_car = db.query(Samochod).filter(Samochod.id == sync_result["car_id"]).first()
+                    
+                    return {
+                        "kosztorysy": kosztorysy_lista,
+                        "pojazd_info": {
+                            "numer_rejestracyjny": kosztorysy[0].numer_rejestracyjny,
+                            "marka": kosztorysy[0].marka,
+                            "model": kosztorysy[0].model,
+                            "rok_produkcji": kosztorysy[0].rok_produkcji
+                        },
+                        "sync_conflict": {
+                            "conflict": True,
+                            "car_id": sync_result["car_id"],
+                            "local_data": {
+                                "marka": local_car.marka,
+                                "model": local_car.model,
+                                "rok_produkcji": local_car.rok_produkcji,
+                                "klient": local_car.klient.nazwapelna if local_car.klient else "Brak klienta",
+                                "telefon": local_car.klient.nr_telefonu if local_car.klient else "Brak telefonu",
+                                "email": local_car.klient.email if local_car.klient else "Brak emailu"
+                            },
+                            "integra_data": {
+                                "marka": kosztorysy[0].marka,
+                                "model": kosztorysy[0].model,
+                                "rok_produkcji": kosztorysy[0].rok_produkcji,
+                                "klient": kosztorysy[0].nazwa_klienta,
+                                "telefon": kosztorysy[0].telefon,
+                                "email": kosztorysy[0].email
+                            },
+                            "message": sync_result["message"]
+                        }
+                    }
+                
+            except Exception as e:
+                print(f"⚠️ Błąd synchronizacji pojazdu: {e}")
+                # Kontynuuj bez synchronizacji
+                sync_result = {"success": False, "error": str(e)}
+
         return {
             "kosztorysy": kosztorysy_lista,
             "pojazd_info": {
@@ -293,7 +371,8 @@ def get_kosztorysy_zewnetrzne(nr_rejestracyjny: str, db_sql: Session = Depends(g
                 "marka": kosztorysy[0].marka,
                 "model": kosztorysy[0].model,
                 "rok_produkcji": kosztorysy[0].rok_produkcji
-            } if kosztorysy else None
+            } if kosztorysy else None,
+            "sync_result": sync_result
         }
         
     except Exception as e:
@@ -312,14 +391,94 @@ async def importuj_kosztorys_z_externa(request: Request, db: Session = Depends(g
         raise HTTPException(status_code=400, detail="Brak wymaganych danych")
     
     try:
-        # Utwórz kosztorys w PostgreSQL na podstawie danych z SQL Server
-        kosztorys = crud.create_kosztorys(
-            db=db,
+        # 1. Utwórz kosztorys w PostgreSQL (bez commitu - zostanie w transakcji)
+        from models import Kosztorys
+        kosztorys = Kosztorys(
             notatka_id=notatka_id,
-            kwota=float(kosztorys_externa.get("kwota_kosztorysu", 0)),
+            kwota_calkowita=float(kosztorys_externa.get("kwota_kosztorysu", 0)),
             opis=f"Importowano z systemu integra - {kosztorys_externa.get('numer_kosztorysu')}",
             numer_kosztorysu=f"IMP-{kosztorys_externa.get('numer_kosztorysu')}"
         )
+        db.add(kosztorys)
+        db.flush()  # Pobierz ID ale nie commituj jeszcze
+        
+        # 2. Importuj towary z Integry
+        for towar_data in kosztorys_externa.get("towary", []):
+            external_id = towar_data["id"]
+            nazwa = towar_data["nazwa"]
+            cena = towar_data["cena"]
+            
+            # Sprawdź czy towar z Integry już istnieje
+            existing_towar = db.query(Towar).filter(
+                Towar.external_id == external_id,
+                Towar.zrodlo == 'integra'
+            ).first()
+            
+            if not existing_towar:
+                # Dodaj nowy towar z Integry
+                new_towar = Towar(
+                    nazwa=nazwa,
+                    cena=cena,
+                    zrodlo='integra',
+                    external_id=external_id
+                )
+                db.add(new_towar)
+                db.flush()  # Pobierz ID
+                towar_id = new_towar.id
+            else:
+                # Użyj istniejącego towaru (możesz zaktualizować cenę)
+                existing_towar.cena = cena
+                towar_id = existing_towar.id
+            
+            # Dodaj towar do kosztorysu
+            from models import KosztorysTowar
+            kosztorys_towar = KosztorysTowar(
+                kosztorys_id=kosztorys.id,
+                towar_id=towar_id,
+                ilosc=towar_data["ilosc"],
+                cena=towar_data["cena"]
+            )
+            db.add(kosztorys_towar)
+        
+        # 3. Importuj usługi z Integry
+        for usluga_data in kosztorys_externa.get("uslugi", []):
+            external_id = usluga_data["id"]
+            nazwa = usluga_data["nazwa"]
+            cena = usluga_data["cena"]
+            
+            # Sprawdź czy usługa z Integry już istnieje
+            existing_usluga = db.query(Usluga).filter(
+                Usluga.external_id == external_id,
+                Usluga.zrodlo == 'integra'
+            ).first()
+            
+            if not existing_usluga:
+                # Dodaj nową usługę z Integry
+                new_usluga = Usluga(
+                    nazwa=nazwa,
+                    cena=cena,
+                    zrodlo='integra',
+                    external_id=external_id
+                )
+                db.add(new_usluga)
+                db.flush()  # Pobierz ID
+                usluga_id = new_usluga.id
+            else:
+                # Użyj istniejącej usługi
+                existing_usluga.cena = cena
+                usluga_id = existing_usluga.id
+            
+            # Dodaj usługę do kosztorysu
+            from models import KosztorysUsluga
+            kosztorys_usluga = KosztorysUsluga(
+                kosztorys_id=kosztorys.id,
+                uslugi_id=usluga_id,
+                ilosc=usluga_data["ilosc"],
+                cena=usluga_data["cena"]
+            )
+            db.add(kosztorys_usluga)
+        
+        db.commit()
         
         return {
             "success": True, 
@@ -405,66 +564,80 @@ async def create_kosztorys_api(request: Request, db: Session = Depends(get_db)):
         for usluga in uslugi:
             kwota_calkowita += float(usluga.get('ilosc', 0)) * float(usluga.get('cena', 0))
         
-        # Utwórz kosztorys
-        kosztorys = crud.create_kosztorys(
-            db=db,
+        # Utwórz kosztorys (bez commitu - zostanie w transakcji)
+        from models import Kosztorys, KosztorysTowar, KosztorysUsluga, Towar, Usluga
+        
+        kosztorys = Kosztorys(
             notatka_id=notatka_id,
-            kwota=kwota_calkowita,
+            kwota_calkowita=kwota_calkowita,
             opis=opis,
             numer_kosztorysu=numer_kosztorysu
         )
+        db.add(kosztorys)
+        db.flush()  # Pobierz ID ale nie commituj jeszcze
         
         # Dodaj towary
         for towar_data in towary:
             if towar_data.get('isCustom'):
-                # Własny towar - utwórz nowy
-                custom_towar = crud.create_custom_towar(
-                    db, 
-                    towar_data['nazwa'], 
-                    towar_data['cena']
+                # Własny towar - utwórz nowy w tej samej transakcji
+                custom_towar = Towar(
+                    nazwa=towar_data['nazwa'],
+                    cena=towar_data['cena'],
+                    zrodlo='local',
+                    external_id=None
                 )
-                crud.add_towar_do_kosztorysu(
-                    db=db,
+                db.add(custom_towar)
+                db.flush()  # Pobierz ID
+                
+                kosztorys_towar = KosztorysTowar(
                     kosztorys_id=kosztorys.id,
                     towar_id=custom_towar.id,
                     ilosc=towar_data['ilosc'],
                     cena=towar_data['cena']
                 )
+                db.add(kosztorys_towar)
             else:
                 # Istniejący towar
-                crud.add_towar_do_kosztorysu(
-                    db=db,
+                kosztorys_towar = KosztorysTowar(
                     kosztorys_id=kosztorys.id,
                     towar_id=towar_data['id'],
                     ilosc=towar_data['ilosc'],
                     cena=towar_data['cena']
                 )
+                db.add(kosztorys_towar)
         
         # Dodaj usługi
         for usluga_data in uslugi:
             if usluga_data.get('isCustom'):
-                # Własna usługa - utwórz nową
-                custom_usluga = crud.create_custom_usluga(
-                    db, 
-                    usluga_data['nazwa'], 
-                    usluga_data['cena']
+                # Własna usługa - utwórz nową w tej samej transakcji
+                custom_usluga = Usluga(
+                    nazwa=usluga_data['nazwa'],
+                    cena=usluga_data['cena'],
+                    zrodlo='local',
+                    external_id=None
                 )
-                crud.add_usluge_do_kosztorysu(
-                    db=db,
+                db.add(custom_usluga)
+                db.flush()  # Pobierz ID
+                
+                kosztorys_usluga = KosztorysUsluga(
                     kosztorys_id=kosztorys.id,
-                    usluga_id=custom_usluga.id,
+                    uslugi_id=custom_usluga.id,
                     ilosc=usluga_data['ilosc'],
                     cena=usluga_data['cena']
                 )
+                db.add(kosztorys_usluga)
             else:
                 # Istniejąca usługa
-                crud.add_usluge_do_kosztorysu(
-                    db=db,
+                kosztorys_usluga = KosztorysUsluga(
                     kosztorys_id=kosztorys.id,
-                    usluga_id=usluga_data['id'],
+                    uslugi_id=usluga_data['id'],
                     ilosc=usluga_data['ilosc'],
                     cena=usluga_data['cena']
                 )
+                db.add(kosztorys_usluga)
+        
+        # Commit wszystkiego naraz
+        db.commit()
         
         return {
             "success": True,
@@ -491,6 +664,34 @@ def delete_kosztorys_api(kosztorys_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Błąd usuwania kosztorysu: {str(e)}")
+
+@router.delete("/kosztorys/{kosztorys_id}/towar/{towar_kosztorys_id}")
+def delete_kosztorys_towar_api(kosztorys_id: int, towar_kosztorys_id: int, db: Session = Depends(get_db)):
+    """Usuwa pojedynczy towar z kosztorysu"""
+    try:
+        success = crud.delete_kosztorys_towar(db, towar_kosztorys_id)
+        if success:
+            return {"success": True, "message": "Towar został usunięty z kosztorysu"}
+        else:
+            raise HTTPException(status_code=404, detail="Towar nie został znaleziony")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Błąd usuwania towaru: {str(e)}")
+
+@router.delete("/kosztorys/{kosztorys_id}/usluga/{usluga_kosztorys_id}")
+def delete_kosztorys_usluga_api(kosztorys_id: int, usluga_kosztorys_id: int, db: Session = Depends(get_db)):
+    """Usuwa pojedynczą usługę z kosztorysu"""
+    try:
+        success = crud.delete_kosztorys_usluga(db, usluga_kosztorys_id)
+        if success:
+            return {"success": True, "message": "Usługa została usunięta z kosztorysu"}
+        else:
+            raise HTTPException(status_code=404, detail="Usługa nie została znaleziona")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Błąd usuwania usługi: {str(e)}")
 
 @router.get("/notatka-szczegoly/{notatka_id}")
 def get_notatka_szczegoly(notatka_id: int, db: Session = Depends(get_db)):
@@ -908,3 +1109,249 @@ def get_today_reminders(db: Session = Depends(get_db)):
     except Exception as e:
         print(f"Błąd pobierania dzisiejszych przypomnień: {e}")
         raise HTTPException(status_code=500, detail=f"Błąd pobierania przypomnień: {str(e)}")
+
+# === API KLIENTÓW ===
+
+@router.get("/klienci/search")
+def search_klienci_api(q: str = "", limit: int = 10, db: Session = Depends(get_db)):
+    """Wyszukiwanie klientów"""
+    from models import Klient
+    
+    if len(q.strip()) < 2:
+        return []
+    
+    # Wyszukaj po nazwie, telefonie, emailu lub NIP
+    klienci = db.query(Klient).filter(
+        or_(
+            Klient.nazwapelna.ilike(f"%{q}%"),
+            Klient.nr_telefonu.ilike(f"%{q}%"),
+            Klient.email.ilike(f"%{q}%"),
+            Klient.nip.ilike(f"%{q}%"),
+            Klient.nazwa_firmy.ilike(f"%{q}%")
+        )
+    ).limit(limit).all()
+    
+    return [
+        {
+            "id": k.id,
+            "nazwapelna": k.nazwapelna,
+            "nr_telefonu": k.nr_telefonu,
+            "email": k.email,
+            "nip": k.nip,
+            "nazwa_firmy": k.nazwa_firmy
+        }
+        for k in klienci
+    ]
+
+@router.post("/klienci")
+async def create_klient_api(request: Request, db: Session = Depends(get_db)):
+    """Dodaj nowego klienta"""
+    from models import Klient
+    
+    data = await request.json()
+    
+    try:
+        nowy_klient = Klient(
+            nazwapelna=data["nazwapelna"],
+            nr_telefonu=data["nr_telefonu"],
+            email=data.get("email"),
+            nip=data.get("nip"),
+            nazwa_firmy=data.get("nazwa_firmy")
+        )
+        
+        db.add(nowy_klient)
+        db.commit()
+        db.refresh(nowy_klient)
+        
+        return {
+            "id": nowy_klient.id,
+            "nazwapelna": nowy_klient.nazwapelna,
+            "nr_telefonu": nowy_klient.nr_telefonu,
+            "email": nowy_klient.email,
+            "nip": nowy_klient.nip,
+            "nazwa_firmy": nowy_klient.nazwa_firmy
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Błąd dodawania klienta: {str(e)}")
+
+# === API SAMOCHODÓW ===
+
+@router.post("/samochody")
+async def create_samochod_api(request: Request, db: Session = Depends(get_db)):
+    """Dodaj nowy samochód"""
+    from models import Samochod, Klient
+    
+    data = await request.json()
+    
+    try:
+        # Sprawdź czy klient istnieje
+        klient = db.query(Klient).filter(Klient.id == data["klient_id"]).first()
+        if not klient:
+            raise HTTPException(status_code=404, detail="Klient nie znaleziony")
+        
+        # Sprawdź czy samochód o takim numerze rejestracyjny już istnieje (ignoruj wielkość liter)
+        istniejacy = db.query(Samochod).filter(
+            Samochod.nr_rejestracyjny.ilike(data["nr_rejestracyjny"])
+        ).first()
+        
+        if istniejacy:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Samochód o numerze {data['nr_rejestracyjny']} już istnieje w bazie"
+            )
+        
+        nowy_samochod = Samochod(
+            klient_id=data["klient_id"],
+            nr_rejestracyjny=data["nr_rejestracyjny"],
+            marka=data["marka"],
+            model=data["model"],
+            rok_produkcji=data.get("rok_produkcji")
+        )
+        
+        db.add(nowy_samochod)
+        db.commit()
+        db.refresh(nowy_samochod)
+        
+        return {
+            "id": nowy_samochod.id,
+            "klient_id": nowy_samochod.klient_id,
+            "nr_rejestracyjny": nowy_samochod.nr_rejestracyjny,
+            "marka": nowy_samochod.marka,
+            "model": nowy_samochod.model,
+            "rok_produkcji": nowy_samochod.rok_produkcji
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Błąd dodawania samochodu: {str(e)}")
+
+# === SPRAWDZANIE POJAZDU W INTEGRZE ===
+
+@router.get("/sprawdz-pojazd-integra/{nr_rejestracyjny}")
+def sprawdz_pojazd_integra(nr_rejestracyjny: str, db_sql: Session = Depends(get_samochody_db)):
+    """Sprawdź czy pojazd istnieje w bazie Integra"""
+    
+    if db_sql is None:
+        raise HTTPException(status_code=503, detail="Brak połączenia z bazą danych integra")
+    
+    try:
+        # Proste zapytanie SELECT do sprawdzenia istnienia pojazdu
+        sql_query = text("""
+            SELECT TOP 1
+                p.nrRejestracyjny as nr_rejestracyjny,
+                ko.nazwaPelna AS wlasciciel
+            FROM Pojazdy p
+            INNER JOIN dbo.Kontrahenci ko on p.idKontrahenciWlasciciel = ko.id
+            WHERE p.nrRejestracyjny = :nr_rej
+        """)
+        
+        result = db_sql.execute(sql_query, {"nr_rej": nr_rejestracyjny}).fetchone()
+        
+        if result:
+            return {
+                "found": True,
+                "nr_rejestracyjny": result.nrRejestracyjny,
+                "wlasciciel": result.wlasciciel,
+            }
+        else:
+            return {
+                "found": False,
+                "message": f"Pojazd {nr_rejestracyjny} nie znaleziony w bazie Integra"
+            }
+            
+    except Exception as e:
+        print(f"Błąd sprawdzania pojazdu w Integrze: {e}")
+        raise HTTPException(status_code=500, detail=f"Błąd sprawdzania pojazdu: {str(e)}")
+
+
+@router.get("/samochody/search-local")
+def search_samochody_local_api(q: str = "", limit: int = 10, db: Session = Depends(get_db)):
+    """Wyszukiwanie samochodów tylko w lokalnej bazie (bez sprawdzania Integra)"""
+    from models import Samochod, Klient
+    
+    if len(q.strip()) < 2:
+        return []
+    
+    # Wyszukaj po numerze rejestracyjnym tylko w lokalnej bazie
+    samochody = db.query(Samochod, Klient).outerjoin(
+        Klient, Samochod.klient_id == Klient.id
+    ).filter(
+        Samochod.nr_rejestracyjny.ilike(f"%{q}%")
+    ).limit(limit).all()
+    
+    return [
+        {
+            "id": s.Samochod.id,
+            "nr_rejestracyjny": s.Samochod.nr_rejestracyjny,
+            "marka": s.Samochod.marka,
+            "model": s.Samochod.model,
+            "rok_produkcji": s.Samochod.rok_produkcji,
+            "klient": {
+                "id": s.Klient.id if s.Klient else None,
+                "nazwapelna": s.Klient.nazwapelna if s.Klient else "Brak klienta",
+                "nr_telefonu": s.Klient.nr_telefonu if s.Klient else None
+            } if s.Klient else {"nazwapelna": "Brak klienta"},
+            "display": f"{s.Samochod.nr_rejestracyjny} - {s.Samochod.marka} {s.Samochod.model} ({s.Samochod.rok_produkcji or 'brak roku'}) [LOKALNA BAZA]",
+            "source": "local"
+        }
+        for s in samochody
+    ]
+
+@router.post("/sync-pojazd-integra/{nr_rejestracyjny}")
+def sync_pojazd_integra_api(
+    nr_rejestracyjny: str,
+    overwrite: bool = False,
+    db: Session = Depends(get_db),
+    db_sql: Session = Depends(get_samochody_db)
+):
+    """Synchronizuje pojazd z Integry z opcją overwrite"""
+    
+    if db_sql is None:
+        raise HTTPException(status_code=503, detail="Brak połączenia z bazą danych integra")
+    
+    try:
+        # Pobierz dane pojazdu z Integry
+        sql_query = """
+        SELECT 
+            ko.nazwaPelna as nazwa_klienta, 
+            ko.telefon1 as telefon, 
+            ko.nip as nip, 
+            ko.email as email,
+            ko.nazwaPelnaLista as nazwa_firmy,
+            mp.nazwa as model, 
+            mk.nazwa as marka, 
+            p.rokProdukcji as rok_produkcji, 
+            p.nrRejestracyjny as numer_rejestracyjny
+        FROM Pojazdy p
+        INNER JOIN Kontrahenci ko ON ko.id = p.idKontrahenciWlasciciel
+        INNER JOIN WersjePojazdow wp ON wp.id = p.idWersjePojazdow
+        INNER JOIN ModelePojazdow mp ON mp.id = wp.idModelePojazdow
+        INNER JOIN MarkiPojazdow mk ON mk.id = mp.idMarkiPojazdow
+        WHERE p.nrRejestracyjny = :nr_rejestracyjny
+        """
+        
+        result = db_sql.execute(text(sql_query), {"nr_rejestracyjny": nr_rejestracyjny})
+        pojazd_integra = result.fetchone()
+        
+        if not pojazd_integra:
+            raise HTTPException(status_code=404, detail=f"Pojazd {nr_rejestracyjny} nie znaleziony w Integrze")
+        
+        # Wywołaj synchronizację
+        sync_result = crud.sync_vehicle_from_integra(db, pojazd_integra, overwrite=overwrite)
+        
+        return {
+            "success": sync_result.get("success", True),
+            "message": sync_result.get("message", "Synchronizacja zakończona pomyślnie"),
+            "car_id": sync_result.get("car_id"),
+            "overwrite": overwrite
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Błąd synchronizacji pojazdu: {e}")
+        raise HTTPException(status_code=500, detail=f"Błąd synchronizacji: {str(e)}")

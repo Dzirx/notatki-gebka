@@ -94,14 +94,3 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     });
 });
-
-// Zamknij modal klawiszem ESC - WYŁĄCZONE
-// Modal zamyka się tylko przez przycisk ❌ i "Anuluj"
-// document.addEventListener('keydown', function(event) {
-//     if (event.key === 'Escape') {
-//         const modal = document.getElementById('detailsModal');
-//         if (modal.style.display === 'block') {
-//             closeDetailsModal();
-//         }
-//     }
-// });

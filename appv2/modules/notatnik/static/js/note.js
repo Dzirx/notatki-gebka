@@ -130,9 +130,7 @@ if (typeof window !== 'undefined') {
         console.log('Status modułów:', window.NotatkiModule.getStatus());
         console.log('Zmienne globalne dodawania:', {
             selectedTowary: window.selectedTowary?.length || 0,
-            selectedUslugi: window.selectedUslugi?.length || 0,
-            towaryData: window.towaryData?.length || 0,
-            uslugiData: window.uslugiData?.length || 0
+            selectedUslugi: window.selectedUslugi?.length || 0
         });
         console.log('Zmienne globalne edycji:', {
             currentEditNoteId: window.currentEditNoteId,

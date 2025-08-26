@@ -42,29 +42,32 @@
                 </div>
             </div>
 
-            <!-- SEKCJA ZAŁĄCZNIKÓW (dla wszystkich typów notatek) -->
-            <div class="card" style="margin-bottom: 20px;">
-                <h4>📎 Załączniki</h4>
-                
-                <!-- Istniejące załączniki -->
-                <div id="editExistingAttachments">
-                    <p style="color: #6c757d; font-style: italic;">Ładowanie...</p>
-                </div>
-                
-                <!-- Upload nowych plików -->
-                <div class="form-group" style="margin-top: 15px;">
-                    <label>Dodaj nowe pliki (max 10MB każdy):</label>
-                    <div id="editFileUploadZone" class="file-upload-zone">
-                        <div class="upload-content">
-                            <div class="upload-icon">📁</div>
-                            <p>Przeciągnij pliki tutaj lub <span class="upload-link">kliknij aby wybrać</span></p>
-                            <small>Obsługiwane: PDF, obrazy, dokumenty Word/Excel, pliki tekstowe</small>
-                        </div>
-                        <input type="file" id="editFileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx,.txt,.csv" style="display: none;">
+            <!-- SEKCJA ZAŁĄCZNIKÓW (ZWINIĘTA) -->
+            <details class="card" style="margin-bottom: 20px; border: 1px solid #ddd; border-radius: 6px; padding: 15px;">
+                <summary style="cursor: pointer; color: #007bff; font-weight: bold; font-size: 1.1em; margin: -15px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+                    📎 Załączniki (kliknij aby rozwinąć)
+                </summary>
+                <div style="margin-top: 15px;">
+                    <!-- Istniejące załączniki -->
+                    <div id="editExistingAttachments">
+                        <p style="color: #6c757d; font-style: italic;">Ładowanie...</p>
                     </div>
-                    <div id="editFileList" class="file-list"></div>
+                    
+                    <!-- Upload nowych plików -->
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label>Dodaj nowe pliki (max 10MB każdy):</label>
+                        <div id="editFileUploadZone" class="file-upload-zone">
+                            <div class="upload-content">
+                                <div class="upload-icon">📁</div>
+                                <p>Przeciągnij pliki tutaj lub <span class="upload-link">kliknij aby rozwinąć</span></p>
+                                <small>Obsługiwane: PDF, obrazy, dokumenty Word/Excel, pliki tekstowe</small>
+                            </div>
+                            <input type="file" id="editFileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx,.txt,.csv" style="display: none;">
+                        </div>
+                        <div id="editFileList" class="file-list"></div>
+                    </div>
                 </div>
-            </div>
+            </details>
 
             <!-- PRZYCISK IMPORTU Z INTEGRA (tylko dla pojazdów) -->
             <div id="editImportSection" class="card" style="margin-bottom: 20px; display: none;">
@@ -115,11 +118,32 @@
                     <!-- WŁASNY TOWAR -->
                     <details style="margin-bottom: 15px;">
                         <summary style="cursor: pointer; color: #007bff;">➕ Dodaj własny towar</summary>
-                        <div style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; display: flex; gap: 10px; flex-wrap: wrap;">
-                            <input type="text" id="editCustomTowarNazwa" placeholder="Nazwa towaru" style="flex: 1; min-width: 150px;">
-                            <input type="number" id="editCustomTowarIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
-                            <input type="number" id="editCustomTowarCena" placeholder="Cena" step="0.01" style="width: 120px;">
-                            <button type="button" class="btn btn-primary" onclick="addCustomTowarToEditCost()">+ Dodaj własny</button>
+                        <div style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+                                <input type="text" id="editCustomTowarNazwa" placeholder="Nazwa towaru" style="flex: 2; min-width: 150px;">
+                                <input type="text" id="editCustomTowarNumer" placeholder="Nr katalogowy" style="flex: 1; min-width: 100px;">
+                                <input type="text" id="editCustomTowarProducent" placeholder="Producent (opcjonalnie)" style="flex: 1; min-width: 120px;">
+                            </div>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+                                <select id="editCustomTowarRodzaj" style="flex: 1; min-width: 120px;">
+                                    <option value="">-- Rodzaj opony (opcjonalnie) --</option>
+                                    <option value="letnia">Letnia</option>
+                                    <option value="zimowa">Zimowa</option>
+                                    <option value="całoroczna">Całoroczna</option>
+                                </select>
+                                <select id="editCustomTowarTyp" style="flex: 1; min-width: 120px;">
+                                    <option value="">-- Typ opony (opcjonalnie) --</option>
+                                    <option value="osobowa">Osobowa</option>
+                                    <option value="dostawcza">Dostawcza</option>
+                                    <option value="ciężarowa">Ciężarowa</option>
+                                </select>
+                                <input type="text" id="editCustomTowarIndeks" placeholder="Indeks nośności (opcjonalnie)" style="flex: 1; min-width: 120px;">
+                            </div>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <input type="number" id="editCustomTowarIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
+                                <input type="number" id="editCustomTowarCena" placeholder="Cena" step="0.01" style="width: 120px;">
+                                <button type="button" class="btn btn-primary" onclick="addCustomTowarToEditCost()">+ Dodaj własny</button>
+                            </div>
                         </div>
                     </details>
                     

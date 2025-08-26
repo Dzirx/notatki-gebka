@@ -59,10 +59,15 @@ async def szczegoly_kosztorysu(notatka_id: int, request: Request, db: Session = 
     # Pobierz kosztorysy z towarami i usługami  
     kosztorysy = crud.get_kosztorysy_z_towarami_dla_notatki(db, notatka_id)
     
+    # Pobierz załączniki powiązane z notatką
+    from models import Zalacznik
+    zalaczniki = db.query(Zalacznik).filter(Zalacznik.notatka_id == notatka_id).all()
+    
     return templates.TemplateResponse("kosztorys_detail.html", {
         "request": request,
         "notatka": notatka,
-        "kosztorysy": kosztorysy
+        "kosztorysy": kosztorysy,
+        "zalaczniki": zalaczniki
     })
 
 @router.get("/kosztorys-detail/{kosztorys_id}", response_class=HTMLResponse)

@@ -12,6 +12,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from modules.notatnik import crud
+from models import Przypomnienie
 
 router = APIRouter()
 
@@ -21,12 +22,22 @@ async def add_notatka(
     typ_notatki: str = Form(...),
     tresc: str = Form(...),
     nr_rejestracyjny: Optional[str] = Form(None),
+    pracownik_id: Optional[str] = Form(None),
     numer_kosztorysu: Optional[str] = Form(None),
     opis_kosztorysu: Optional[str] = Form(None),
     importowane_kosztorysy: Optional[str] = Form(None),  # ← NOWE POLE
+    data_przypomnienia: Optional[str] = Form(None),  # ← PRZYPOMNIENIA
     db: Session = Depends(get_db)
 ):
     """DODAWANIE NOTATKI - Szybka lub do pojazdu + opcjonalny kosztorys + import z integra"""
+    
+    # Konwertuj pracownik_id - pusty string na None
+    pracownik_id_int = None
+    if pracownik_id and pracownik_id.strip():
+        try:
+            pracownik_id_int = int(pracownik_id)
+        except ValueError:
+            pracownik_id_int = None
     
     ma_kosztorys = bool(numer_kosztorysu and numer_kosztorysu.strip())
     ma_import_kosztorysow = bool(importowane_kosztorysy and importowane_kosztorysy.strip())
@@ -45,11 +56,11 @@ async def add_notatka(
     
     # TWORZENIE NOTATKI
     if typ_notatki == "szybka":
-        notatka = crud.create_notatka_szybka(db, tresc)
+        notatka = crud.create_notatka_szybka(db, tresc, pracownik_id_int)
     elif typ_notatki == "pojazd" and nr_rejestracyjny:
         samochod = crud.get_samochod_by_rejestracja(db, nr_rejestracyjny)
         if samochod:
-            notatka = crud.create_notatka_samochod(db, samochod.id, tresc)
+            notatka = crud.create_notatka_samochod(db, samochod.id, tresc, pracownik_id_int)
         else:
             # Utwórz samochód jeśli nie istnieje (z danych z integra)
             if ma_import_kosztorysow:
@@ -77,16 +88,16 @@ async def add_notatka(
                             rok_produkcji=pojazd_data.get('rok_produkcji')
                         )
                         
-                        notatka = crud.create_notatka_samochod(db, samochod.id, tresc)
+                        notatka = crud.create_notatka_samochod(db, samochod.id, tresc, pracownik_id_int)
                     else:
-                        notatka = crud.create_notatka_szybka(db, f"Pojazd {nr_rejestracyjny}: {tresc}")
+                        notatka = crud.create_notatka_szybka(db, f"Pojazd {nr_rejestracyjny}: {tresc}", pracownik_id_int)
                 except Exception as e:
                     print(f"Błąd tworzenia samochodu z danych integra: {e}")
-                    notatka = crud.create_notatka_szybka(db, f"Pojazd {nr_rejestracyjny}: {tresc}")
+                    notatka = crud.create_notatka_szybka(db, f"Pojazd {nr_rejestracyjny}: {tresc}", pracownik_id_int)
             else:
-                notatka = crud.create_notatka_szybka(db, f"Pojazd {nr_rejestracyjny}: {tresc}")
+                notatka = crud.create_notatka_szybka(db, f"Pojazd {nr_rejestracyjny}: {tresc}", pracownik_id_int)
     else:
-        notatka = crud.create_notatka_szybka(db, tresc)
+        notatka = crud.create_notatka_szybka(db, tresc, pracownik_id_int)
     
     # TWORZENIE ZWYKŁEGO KOSZTORYSU (stara funkcjonalność)
     if ma_kosztorys and notatka:
@@ -205,4 +216,32 @@ async def add_notatka(
         except Exception as e:
             print(f"❌ Błąd importu kosztorysów: {e}")
     
-    return RedirectResponse(url="/notatnik", status_code=303)
+    # DODAJ PRZYPOMNIENIE (jeśli podano)
+    if data_przypomnienia and data_przypomnienia.strip() and notatka:
+        try:
+            from datetime import datetime
+            data_remind = datetime.fromisoformat(data_przypomnienia)
+            
+            przypomnienie = Przypomnienie(
+                notatka_id=notatka.id,
+                data_przypomnienia=data_remind,
+                wyslane=0
+            )
+            
+            db.add(przypomnienie)
+            db.commit()
+            print(f"✅ Dodano przypomnienie na {data_remind}")
+            
+        except Exception as e:
+            print(f"❌ Błąd dodawania przypomnienia: {e}")
+    
+    # Sprawdź czy to AJAX request
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type or request.headers.get("accept", "").startswith("application/json"):
+        return {
+            "success": True,
+            "notatka_id": notatka.id,
+            "message": "Notatka została zapisana"
+        }
+    else:
+        return RedirectResponse(url="/notatnik", status_code=303)

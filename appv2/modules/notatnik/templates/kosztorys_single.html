@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/static/css/base.css">
     <link rel="stylesheet" href="/static/css/components.css">
     <link rel="stylesheet" href="/modules/notatnik/static/css/table.css">
+    <link rel="stylesheet" href="/modules/notatnik/static/css/kosztorys-modal.css">
 </head>
 <body>
     <div class="container">
@@ -15,6 +16,12 @@
         <div class="header">
             <h1>💰 Kosztorys {{ kosztorys.numer }}</h1>
             <div>
+                <button onclick="editKosztorys({{ kosztorys.id }})" class="btn-primary" style="margin-right: 10px;">
+                    ✏️ Edytuj kosztorys
+                </button>
+                <button onclick="deleteKosztorys({{ kosztorys.id }}, {{ notatka.id }})" class="btn-danger" style="margin-right: 10px;">
+                    🗑️ Usuń kosztorys
+                </button>
                 <a href="/notatnik" class="btn-secondary">← Powrót do notatek</a>
                 <a href="/notatnik/kosztorys/{{ notatka.id }}" class="btn-info">📋 Wszystkie kosztorysy</a>
             </div>
@@ -132,20 +139,94 @@
         </div>
         {% endif %}
 
-        <!-- PODSUMOWANIE -->
-        <div class="card" style="padding: 20px; background: #e8f5e8; border-radius: 8px; border-left: 5px solid #28a745;">
-            <h3>📊 Podsumowanie</h3>
-            <div style="font-size: 1.2em;">
-                {% set towary_suma = kosztorys.towary|sum(attribute='wartosc') %}
-                {% set uslugi_suma = kosztorys.uslugi|sum(attribute='wartosc') %}
-                <p><strong>Towary:</strong> {{ "%.2f"|format(towary_suma) }} zł</p>
-                <p><strong>Usługi:</strong> {{ "%.2f"|format(uslugi_suma) }} zł</p>
-                <hr>
-                <p style="font-size: 1.4em; font-weight: bold; color: #28a745;">
-                    <strong>RAZEM: {{ "%.2f"|format(kosztorys.kwota_calkowita) }} zł</strong>
-                </p>
+    </div>
+
+    <!-- MODAL EDYCJI KOSZTORYSU -->
+    <div id="editKosztorysModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2>✏️ Edycja kosztorysu: {{ kosztorys.numer }}</h2>
+                <button class="modal-close" onclick="closeEditKosztorysModal()">✕</button>
             </div>
+            
+            <form id="editKosztorysForm">
+                <div class="modal-body">
+                    <!-- PODSTAWOWE DANE -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <div>
+                            <label for="editKosztorysNumer"><strong>Numer kosztorysu:</strong></label>
+                            <input type="text" id="editKosztorysNumer" class="form-control" 
+                                   value="{{ kosztorys.numer }}" required>
+                        </div>
+                        <div>
+                            <label for="editKosztorysStatus"><strong>Status:</strong></label>
+                            <select id="editKosztorysStatus" class="form-control">
+                                <option value="draft" {{ 'selected' if kosztorys.status == 'draft' else '' }}>Draft</option>
+                                <option value="approved" {{ 'selected' if kosztorys.status == 'approved' else '' }}>Approved</option>
+                                <option value="rejected" {{ 'selected' if kosztorys.status == 'rejected' else '' }}>Rejected</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label for="editKosztorysOpis"><strong>Opis:</strong></label>
+                        <textarea id="editKosztorysOpis" class="form-control" rows="3">{{ kosztorys.opis or '' }}</textarea>
+                    </div>
+
+                    <!-- TOWARY -->
+                    <div class="kosztorys-section">
+                        <h4>📦 Towary</h4>
+                        <div id="editTowarySectionContainer">
+                            <div id="editTowaryList">
+                                <!-- Będzie wypełnione przez JavaScript -->
+                            </div>
+                            <button type="button" class="btn btn-secondary" onclick="addNewTowarRow()">+ Dodaj towar</button>
+                        </div>
+                    </div>
+
+                    <!-- USŁUGI -->
+                    <div class="kosztorys-section" style="margin-top: 30px;">
+                        <h4>🔧 Usługi</h4>
+                        <div id="editUslugiSectionContainer">
+                            <div id="editUslugiList">
+                                <!-- Będzie wypełnione przez JavaScript -->
+                            </div>
+                            <button type="button" class="btn btn-secondary" onclick="addNewUslugaRow()">+ Dodaj usługę</button>
+                        </div>
+                    </div>
+
+                    <!-- PODSUMOWANIE -->
+                    <div class="kosztorys-summary" style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+                        <h4>💰 Podsumowanie</h4>
+                        <div style="display: flex; justify-content: space-between; font-size: 1.2em; font-weight: bold;">
+                            <span>Łączna kwota:</span>
+                            <span id="editTotalAmount">{{ "%.2f"|format(kosztorys.kwota_calkowita) }} zł</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditKosztorysModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">💾 Zapisz zmiany</button>
+                </div>
+            </form>
         </div>
     </div>
+
+    <!-- JAVASCRIPT -->
+    <script>
+        // Przekaż dane do JavaScript
+        window.kosztorysData = {
+            id: {{ kosztorys.id }},
+            noteId: {{ notatka.id }},
+            numer: "{{ kosztorys.numer or '' }}",
+            opis: "{{ kosztorys.opis or '' }}",
+            status: "{{ kosztorys.status }}",
+            kwota: {{ "%.2f"|format(kosztorys.kwota_calkowita or 0) }},
+            towary: {{ kosztorys.towary|tojson if kosztorys.towary else '[]' }},
+            uslugi: {{ kosztorys.uslugi|tojson if kosztorys.uslugi else '[]' }}
+        };
+    </script>
+    <script src="/modules/notatnik/static/js/kosztorys-single.js"></script>
 </body>
 </html>

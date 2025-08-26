@@ -7,11 +7,10 @@ console.log('📝 Moduł note-edit załadowany');
 window.currentEditNoteId = null;
 window.editSelectedTowary = [];
 window.editSelectedUslugi = [];
-window.editTowaryData = [];
-window.editUslugiData = [];
 window.editExistingCosts = [];
 window.editNoteData = null;
 window.editIntegraKosztorysy = [];
+// editTowaryData i editUslugiData usunięte - używamy wyszukiwarek
 
 // OTWIERANIE MODALA EDYCJI
 async function openEditModal(noteId) {
@@ -37,6 +36,14 @@ async function openEditModal(noteId) {
         const editTresc = document.getElementById('edit_tresc');
         if (editTresc) editTresc.value = noteData.tresc || '';
         
+        // Pobierz szczegółowe dane notatki z pracownikiem (dla wszystkich notatek)
+        const detailResponse = await fetch(`/api/notatka/${noteId}`);
+        const detailData = await detailResponse.json();
+        const editPracownikId = document.getElementById('edit_pracownik_id');
+        if (editPracownikId) {
+            editPracownikId.value = detailData.pracownik_id || '';
+        }
+        
         // Pokaż przycisk importu z integra jeśli to pojazd
         const editImportSection = document.getElementById('editImportSection');
         if (editImportSection) {
@@ -50,8 +57,17 @@ async function openEditModal(noteId) {
         // Załaduj dane towarów i usług
         await loadEditDropdownData();
         
+        // Inicjalizuj upload zone dla załączników
+        initEditFileUpload();
+        
+        // Załaduj istniejące załączniki
+        await loadExistingAttachments(noteId);
+        
         // Załaduj istniejące kosztorysy
         await loadExistingCosts();
+        
+        // Załaduj istniejące przypomnienia
+        await loadExistingReminders(noteId);
         
     } catch (error) {
         console.error('Błąd otwierania modala:', error);
@@ -60,41 +76,31 @@ async function openEditModal(noteId) {
     }
 }
 
-// ŁADOWANIE DANYCH DO DROPDOWNÓW (EDYCJA)
+// ŁADOWANIE DANYCH PRACOWNIKÓW (EDYCJA)
 async function loadEditDropdownData() {
     try {
-        const [towaryResponse, uslugiResponse] = await Promise.all([
-            fetch('/api/towary'),
-            fetch('/api/uslugi')
-        ]);
-        
-        window.editTowaryData = await towaryResponse.json();
-        window.editUslugiData = await uslugiResponse.json();
+        // Tylko pracownicy - towary i usługi używają wyszukiwarek
+        const pracownicyResponse = await fetch('/api/pracownicy');
+        window.editPracownicyData = await pracownicyResponse.json();
         
         populateEditSelects();
         
     } catch (error) {
-        console.error('Błąd ładowania danych:', error);
+        console.error('Błąd ładowania danych pracowników:', error);
     }
 }
 
 function populateEditSelects() {
-    const towarSelect = document.getElementById('editSelectTowar');
-    const uslugaSelect = document.getElementById('editSelectUsluga');
+    // editSelectTowar i editSelectUsluga zastąpione wyszukiwarkami
+    const pracownikSelect = document.getElementById('edit_pracownik_id');
     
-    if (towarSelect) {
-        // Wypełnij towary
-        towarSelect.innerHTML = '<option value="">-- Wybierz towar --</option>';
-        window.editTowaryData.forEach(towar => {
-            towarSelect.innerHTML += `<option value="${towar.id}">${towar.nazwa} - ${parseFloat(towar.cena).toFixed(2)}zł</option>`;
-        });
-    }
-    
-    if (uslugaSelect) {
-        // Wypełnij usługi
-        uslugaSelect.innerHTML = '<option value="">-- Wybierz usługę --</option>';
-        window.editUslugiData.forEach(usluga => {
-            uslugaSelect.innerHTML += `<option value="${usluga.id}">${usluga.nazwa} - ${parseFloat(usluga.cena).toFixed(2)}zł</option>`;
+    if (pracownikSelect) {
+        // Wypełnij pracowników (zachowaj current value)
+        const currentValue = pracownikSelect.value;
+        pracownikSelect.innerHTML = '<option value="">-- Wybierz pracownika --</option>';
+        window.editPracownicyData.forEach(pracownik => {
+            const selected = pracownik.id == currentValue ? 'selected' : '';
+            pracownikSelect.innerHTML += `<option value="${pracownik.id}" ${selected}>${pracownik.pelne_imie}</option>`;
         });
     }
 }
@@ -152,16 +158,17 @@ function renderExistingCosts() {
 
 // DODAWANIE TOWARÓW (EDYCJA)
 function addTowarToEditCost() {
-    const selectTowar = document.getElementById('editSelectTowar');
+    const selectedTowarId = document.getElementById('editSelectedTowarId');
+    const selectedTowarData = document.getElementById('editSelectedTowarData');
     const iloscInput = document.getElementById('editTowarIlosc');
     const cenaInput = document.getElementById('editTowarCena');
     
-    if (!selectTowar.value || !iloscInput.value || !cenaInput.value) {
-        alert('Wypełnij wszystkie pola');
+    if (!selectedTowarId.value || !iloscInput.value || !cenaInput.value) {
+        alert('Wypełnij wszystkie pola (wybierz towar, ilość i cenę)');
         return;
     }
     
-    const selectedTowar = window.editTowaryData.find(t => t.id == selectTowar.value);
+    const selectedTowar = JSON.parse(selectedTowarData.value);
     if (!selectedTowar) return;
     
     const newItem = {
@@ -175,7 +182,9 @@ function addTowarToEditCost() {
     window.editSelectedTowary.push(newItem);
     
     // Reset pól
-    selectTowar.value = '';
+    document.getElementById('editSearchTowar').value = '';
+    selectedTowarId.value = '';
+    selectedTowarData.value = '';
     iloscInput.value = '';
     cenaInput.value = '';
     
@@ -184,19 +193,31 @@ function addTowarToEditCost() {
 
 function addCustomTowarToEditCost() {
     const nazwaInput = document.getElementById('editCustomTowarNazwa');
+    const numerInput = document.getElementById('editCustomTowarNumer');
+    const producentInput = document.getElementById('editCustomTowarProducent');
+    const rodzajSelect = document.getElementById('editCustomTowarRodzaj');
+    const typSelect = document.getElementById('editCustomTowarTyp');
+    const indeksInput = document.getElementById('editCustomTowarIndeks');
     const iloscInput = document.getElementById('editCustomTowarIlosc');
     const cenaInput = document.getElementById('editCustomTowarCena');
     
     if (!nazwaInput.value || !iloscInput.value || !cenaInput.value) {
-        alert('Wypełnij wszystkie pola');
+        alert('Wypełnij wszystkie pola obowiązkowe (nazwa, ilość, cena)');
         return;
     }
     
     const newItem = {
         id: null,
         nazwa: nazwaInput.value,
+        numer_katalogowy: numerInput.value || null,
+        nazwa_producenta: producentInput.value || null,
+        rodzaj_opony: rodzajSelect.value || null,
+        typ_opony: typSelect.value || null,
+        opona_indeks_nosnosci: indeksInput.value || null,
         ilosc: parseFloat(iloscInput.value),
         cena: parseFloat(cenaInput.value),
+        zrodlo: 'local',
+        external_id: null,
         isCustom: true
     };
     
@@ -204,6 +225,11 @@ function addCustomTowarToEditCost() {
     
     // Reset pól
     nazwaInput.value = '';
+    numerInput.value = '';
+    producentInput.value = '';
+    rodzajSelect.value = '';
+    typSelect.value = '';
+    indeksInput.value = '';
     iloscInput.value = '';
     cenaInput.value = '';
     
@@ -212,16 +238,17 @@ function addCustomTowarToEditCost() {
 
 // DODAWANIE USŁUG (EDYCJA)
 function addUslugaToEditCost() {
-    const selectUsluga = document.getElementById('editSelectUsluga');
+    const selectedUslugaId = document.getElementById('editSelectedUslugaId');
+    const selectedUslugaData = document.getElementById('editSelectedUslugaData');
     const iloscInput = document.getElementById('editUslugaIlosc');
     const cenaInput = document.getElementById('editUslugaCena');
     
-    if (!selectUsluga.value || !iloscInput.value || !cenaInput.value) {
-        alert('Wypełnij wszystkie pola');
+    if (!selectedUslugaId.value || !iloscInput.value || !cenaInput.value) {
+        alert('Wypełnij wszystkie pola (wybierz usługę, ilość i cenę)');
         return;
     }
     
-    const selectedUsluga = window.editUslugiData.find(u => u.id == selectUsluga.value);
+    const selectedUsluga = JSON.parse(selectedUslugaData.value);
     if (!selectedUsluga) return;
     
     const newItem = {
@@ -235,7 +262,9 @@ function addUslugaToEditCost() {
     window.editSelectedUslugi.push(newItem);
     
     // Reset pól
-    selectUsluga.value = '';
+    document.getElementById('editSearchUsluga').value = '';
+    selectedUslugaId.value = '';
+    selectedUslugaData.value = '';
     iloscInput.value = '';
     cenaInput.value = '';
     
@@ -257,6 +286,8 @@ function addCustomUslugaToEditCost() {
         nazwa: nazwaInput.value,
         ilosc: parseFloat(iloscInput.value),
         cena: parseFloat(cenaInput.value),
+        zrodlo: 'local',
+        external_id: null,
         isCustom: true
     };
     
@@ -285,7 +316,7 @@ function renderEditSelectedTowary() {
     container.innerHTML = window.editSelectedTowary.map((item, index) => `
         <div class="edit-cost-item">
             <div class="item-info">
-                <strong>${item.nazwa}</strong> ${item.isCustom ? '<span style="color: #007bff;">(własny)</span>' : ''}<br>
+                <strong>${item.nazwa}</strong>${item.numer_katalogowy ? ` <span style="color: #666; font-size: 0.9em;">${item.numer_katalogowy}</span>` : ''}<br>
                 <small>Ilość: ${item.ilosc} × ${item.cena.toFixed(2)} zł = <strong>${(item.ilosc * item.cena).toFixed(2)} zł</strong></small>
             </div>
             <div class="item-actions">
@@ -312,7 +343,7 @@ function renderEditSelectedUslugi() {
     container.innerHTML = window.editSelectedUslugi.map((item, index) => `
         <div class="edit-cost-item">
             <div class="item-info">
-                <strong>${item.nazwa}</strong> ${item.isCustom ? '<span style="color: #007bff;">(własna)</span>' : ''}<br>
+                <strong>${item.nazwa}</strong><br>
                 <small>Ilość: ${item.ilosc} × ${item.cena.toFixed(2)} zł = <strong>${(item.ilosc * item.cena).toFixed(2)} zł</strong></small>
             </div>
             <div class="item-actions">
@@ -582,11 +613,10 @@ function resetEditModal() {
     window.currentEditNoteId = null;
     window.editSelectedTowary = [];
     window.editSelectedUslugi = [];
-    window.editTowaryData = [];
-    window.editUslugiData = [];
     window.editExistingCosts = [];
     window.editNoteData = null;
     window.editIntegraKosztorysy = [];
+    // editTowaryData i editUslugiData już nie istnieją
     
     // Reset pól formularza
     const editTresc = document.getElementById('edit_tresc');
@@ -596,6 +626,25 @@ function resetEditModal() {
     if (editTresc) editTresc.value = '';
     if (editNewCostNumber) editNewCostNumber.value = '';
     if (editNewCostDescription) editNewCostDescription.value = '';
+    
+    // Reset pól dodawania własnych towarów w edycji
+    const editCustomTowarNazwa = document.getElementById('editCustomTowarNazwa');
+    const editCustomTowarNumer = document.getElementById('editCustomTowarNumer');
+    const editCustomTowarProducent = document.getElementById('editCustomTowarProducent');
+    const editCustomTowarRodzaj = document.getElementById('editCustomTowarRodzaj');
+    const editCustomTowarTyp = document.getElementById('editCustomTowarTyp');
+    const editCustomTowarIndeks = document.getElementById('editCustomTowarIndeks');
+    const editCustomTowarIlosc = document.getElementById('editCustomTowarIlosc');
+    const editCustomTowarCena = document.getElementById('editCustomTowarCena');
+    
+    if (editCustomTowarNazwa) editCustomTowarNazwa.value = '';
+    if (editCustomTowarNumer) editCustomTowarNumer.value = '';
+    if (editCustomTowarProducent) editCustomTowarProducent.value = '';
+    if (editCustomTowarRodzaj) editCustomTowarRodzaj.value = '';
+    if (editCustomTowarTyp) editCustomTowarTyp.value = '';
+    if (editCustomTowarIndeks) editCustomTowarIndeks.value = '';
+    if (editCustomTowarIlosc) editCustomTowarIlosc.value = '';
+    if (editCustomTowarCena) editCustomTowarCena.value = '';
     
     // Reset wyświetlanych kontenerów
     const editSelectedTowary = document.getElementById('editSelectedTowary');
@@ -619,17 +668,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!id) return alert('Brak ID notatki');
 
             const tresc = document.getElementById('edit_tresc').value.trim();
-            if (!tresc) return alert('Treść notatki nie może być pusta');
+            const pracownikSelect = document.getElementById('edit_pracownik_id');
+            const pracownik_id = pracownikSelect ? (pracownikSelect.value || null) : null;
 
             try {
                 const res = await fetch(`/api/notatka/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tresc }),
+                    body: JSON.stringify({ tresc, pracownik_id }),
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || 'Nie udało się zapisać');
 
+                // Jeśli są pliki do przesłania, prześlij je
+                if (window.editPendingFiles && window.editPendingFiles.length > 0) {
+                    await uploadEditPendingFiles(id);
+                }
+                
                 alert('✅ Notatka została zaktualizowana!');
                 
                 // Zamknij modal i odśwież stronę
@@ -642,5 +697,341 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// === OBSŁUGA ZAŁĄCZNIKÓW W EDYCJI ===
+
+// Zmienne globalne dla załączników w edycji
+window.editPendingFiles = [];
+window.editUploadedFiles = [];
+
+// Inicjalizacja upload zone dla edycji
+function initEditFileUpload() {
+    const uploadZone = document.getElementById('editFileUploadZone');
+    const fileInput = document.getElementById('editFileInput');
+    
+    if (!uploadZone || !fileInput) return;
+    
+    // Kliknięcie w upload zone
+    uploadZone.addEventListener('click', () => {
+        fileInput.click();
+    });
+    
+    // Wybór plików przez input
+    fileInput.addEventListener('change', (e) => {
+        handleEditFiles(e.target.files);
+    });
+    
+    // Drag & Drop
+    uploadZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadZone.classList.add('dragover');
+    });
+    
+    uploadZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+    });
+    
+    uploadZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+        handleEditFiles(e.dataTransfer.files);
+    });
+}
+
+function handleEditFiles(files) {
+    for (let file of files) {
+        if (validateEditFile(file)) {
+            addEditFileToList(file);
+        }
+    }
+}
+
+function validateEditFile(file) {
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const allowedTypes = [
+        'image/jpeg', 'image/png', 'image/gif',
+        'application/pdf',
+        'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/plain', 'text/csv'
+    ];
+    
+    if (file.size > maxSize) {
+        alert(`Plik "${file.name}" jest za duży (max 10MB)`);
+        return false;
+    }
+    
+    if (!allowedTypes.includes(file.type)) {
+        alert(`Plik "${file.name}" ma nieobsługiwany format`);
+        return false;
+    }
+    
+    return true;
+}
+
+function addEditFileToList(file) {
+    const fileList = document.getElementById('editFileList');
+    const fileId = Date.now() + Math.random();
+    
+    const fileItem = document.createElement('div');
+    fileItem.className = 'file-item';
+    fileItem.id = `edit-file-${fileId}`;
+    
+    fileItem.innerHTML = `
+        <div class="file-info">
+            <div class="file-icon">${getEditFileIcon(file.type)}</div>
+            <div class="file-details">
+                <div class="file-name">${file.name}</div>
+                <div class="file-size">${formatEditFileSize(file.size)}</div>
+            </div>
+        </div>
+        <div class="file-actions">
+            <span class="file-status uploading">Gotowy do wysłania</span>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeEditFile('${fileId}')">🗑️</button>
+        </div>
+    `;
+    
+    fileList.appendChild(fileItem);
+    
+    // Dodaj plik do listy oczekujących
+    window.editPendingFiles.push({
+        id: fileId,
+        file: file,
+        element: fileItem
+    });
+}
+
+function removeEditFile(fileId) {
+    const element = document.getElementById(`edit-file-${fileId}`);
+    if (element) {
+        element.remove();
+    }
+    
+    // Usuń z listy oczekujących
+    window.editPendingFiles = window.editPendingFiles.filter(f => f.id !== fileId);
+}
+
+function getEditFileIcon(mimeType) {
+    if (mimeType.startsWith('image/')) return '🖼️';
+    if (mimeType === 'application/pdf') return '📄';
+    if (mimeType.includes('word')) return '📝';
+    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return '📊';
+    if (mimeType.startsWith('text/')) return '📃';
+    return '📎';
+}
+
+function formatEditFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// Funkcja wywoływana po aktualizacji notatki - przesyła pliki
+async function uploadEditPendingFiles(noteId) {
+    if (window.editPendingFiles.length === 0) return;
+    
+    for (let pendingFile of window.editPendingFiles) {
+        try {
+            const statusElement = pendingFile.element.querySelector('.file-status');
+            statusElement.textContent = 'Wysyłanie...';
+            statusElement.className = 'file-status uploading';
+            
+            const formData = new FormData();
+            formData.append('file', pendingFile.file);
+            
+            const response = await fetch(`/api/notatka/${noteId}/upload`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                statusElement.textContent = 'Wysłano';
+                statusElement.className = 'file-status uploaded';
+            } else {
+                throw new Error(result.detail || 'Błąd wysyłania');
+            }
+            
+        } catch (error) {
+            const statusElement = pendingFile.element.querySelector('.file-status');
+            statusElement.textContent = 'Błąd';
+            statusElement.className = 'file-status error';
+            console.error('Błąd wysyłania pliku:', error);
+        }
+    }
+    
+    // Wyczyść listę oczekujących
+    window.editPendingFiles = [];
+}
+
+// Ładowanie istniejących załączników
+async function loadExistingAttachments(noteId) {
+    try {
+        const response = await fetch(`/api/notatka/${noteId}/zalaczniki`);
+        const attachments = await response.json();
+        
+        const container = document.getElementById('editExistingAttachments');
+        
+        if (attachments.length === 0) {
+            container.innerHTML = '<p style="color: #6c757d; font-style: italic;">Brak załączników</p>';
+            return;
+        }
+        
+        container.innerHTML = attachments.map(att => `
+            <div class="existing-attachment">
+                <div class="file-info">
+                    <div class="file-icon">${getEditFileIcon(att.typ_mime)}</div>
+                    <div class="file-details">
+                        <div class="file-name">${att.nazwa_pliku}</div>
+                        <div class="file-size">${formatEditFileSize(att.rozmiar)}</div>
+                    </div>
+                </div>
+                <div class="file-actions">
+                    <a href="/api/zalacznik/${att.id}" class="btn btn-sm btn-primary" download>📥 Pobierz</a>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="deleteAttachment(${att.id})">🗑️</button>
+                </div>
+            </div>
+        `).join('');
+        
+    } catch (error) {
+        console.error('Błąd ładowania załączników:', error);
+        const container = document.getElementById('editExistingAttachments');
+        container.innerHTML = '<p style="color: #dc3545;">Błąd ładowania załączników</p>';
+    }
+}
+
+// Usuwanie istniejącego załącznika
+async function deleteAttachment(attachmentId) {
+    if (!confirm('Czy na pewno chcesz usunąć ten załącznik?')) return;
+    
+    try {
+        const response = await fetch(`/api/zalacznik/${attachmentId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            // Odśwież listę załączników
+            loadExistingAttachments(window.currentEditNoteId);
+        } else {
+            const result = await response.json();
+            alert(`Błąd usuwania: ${result.detail}`);
+        }
+    } catch (error) {
+        console.error('Błąd usuwania załącznika:', error);
+        alert('Błąd usuwania załącznika');
+    }
+}
+
+// === PRZYPOMNIENIA ===
+
+// Ładowanie istniejących przypomnień
+async function loadExistingReminders(noteId) {
+    try {
+        const response = await fetch(`/api/notatka/${noteId}/przypomnienia`);
+        const reminders = await response.json();
+        
+        const container = document.getElementById('editExistingReminders');
+        
+        if (reminders.length === 0) {
+            container.innerHTML = '<p style="color: #6c757d; font-style: italic;">Brak przypomnień</p>';
+            return;
+        }
+        
+        container.innerHTML = reminders.map(reminder => {
+            const date = new Date(reminder.data_przypomnienia);
+            const formattedDate = date.toLocaleString('pl-PL');
+            const statusText = reminder.wyslane ? 'Wysłane' : 'Oczekuje';
+            const statusClass = reminder.wyslane ? 'text-success' : 'text-warning';
+            
+            return `
+                <div class="existing-reminder" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                    <div class="reminder-info">
+                        <div class="reminder-date" style="font-weight: 500;">⏰ ${formattedDate}</div>
+                        <div class="reminder-status ${statusClass}" style="font-size: 12px;">${statusText}</div>
+                    </div>
+                    <div class="reminder-actions">
+                        <button type="button" class="btn btn-sm btn-danger" onclick="deleteReminder(${reminder.id})">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+    } catch (error) {
+        console.error('Błąd ładowania przypomnień:', error);
+        const container = document.getElementById('editExistingReminders');
+        container.innerHTML = '<p style="color: #dc3545;">Błąd ładowania przypomnień</p>';
+    }
+}
+
+// Dodawanie nowego przypomnienia
+async function addReminder() {
+    const noteId = window.currentEditNoteId;
+    if (!noteId) {
+        alert('Błąd: brak ID notatki');
+        return;
+    }
+    
+    const dateInput = document.getElementById('edit_data_przypomnienia');
+    const dateValue = dateInput.value;
+    
+    if (!dateValue) {
+        alert('Proszę wybrać datę przypomnienia');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/notatka/${noteId}/przypomnienie`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                data_przypomnienia: dateValue
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('Przypomnienie zostało dodane', 'success');
+            dateInput.value = '';
+            await loadExistingReminders(noteId);
+
+        } else {
+            showToast(result.detail || 'Błąd dodawania przypomnienia', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Błąd dodawania przypomnienia:', error);
+        showToast('Błąd dodawania przypomnienia', 'error');
+    }
+}
+
+// Usuwanie przypomnienia
+async function deleteReminder(reminderId) {
+    if (!confirm('Czy na pewno chcesz usunąć to przypomnienie?')) return;
+    
+    try {
+        const response = await fetch(`/api/przypomnienie/${reminderId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showToast('Przypomnienie zostało usunięte', 'success');
+            await loadExistingReminders(window.currentEditNoteId);
+        } else {
+            const result = await response.json();
+            showToast(result.detail || 'Błąd usuwania przypomnienia', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Błąd usuwania przypomnienia:', error);
+        showToast('Błąd usuwania przypomnienia', 'error');
+    }
+}
 
 console.log('✅ note-edit.js załadowany');

@@ -21,7 +21,7 @@ def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
             ko.felgiOpon AS wheels,
             ko.rodzajDepozytu AS rodzaj_opony,
             kpo.glebokoscBieznika AS bieznik,
-            ko.lokalizacjeOpon AS lokalizacja,
+            RTRIM(LEFT(ko.lokalizacjeOpon, CHARINDEX('(', ko.lokalizacjeOpon + '(') - 1)) AS lokalizacja,
             zp.data AS data,
             kpo.wymianaOpis as opona_uwagi,
             ko.uwagi as karta_przechowywalni_uwagi,
@@ -147,6 +147,58 @@ def get_opony_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any]]:
     except Exception as e:
         print(f"❌ Błąd podczas pobierania danych opon: {e}")
         return []
+
+def get_pojazdy_tylko_towary_terminarz(db: Session, selected_date: str) -> List[Dict[str, Any]]:
+    """Zwraca pojazdy z terminarza które mają tylko towary/usługi (bez depozytu)"""
+    
+    query_towary = text("""
+        SELECT 
+            p.nrRejestracyjny AS rej,
+            STUFF((SELECT DISTINCT ', ' + t.nazwa + ' (nr katalogowy: ' + ISNULL(t.nrKatalogowy, '') + ') ' + CAST(tk.ilosc AS varchar) + ' szt'
+                    FROM TowaryKosztorysow tk 
+                    JOIN Towary t ON t.id = tk.idTowary 
+                    WHERE tk.idKosztorysy = k.id
+                    FOR XML PATH('')), 1, 2, '') AS towary_szczegoly,
+            STUFF((SELECT DISTINCT ', ' + u.nazwa 
+                    FROM UslugiKosztorysow uk 
+                    JOIN Uslugi u ON u.id = uk.idUslugi 
+                    WHERE uk.idKosztorysy = k.id
+                    FOR XML PATH('')), 1, 2, '') AS uslugi_szczegoly
+        FROM ZapisyTerminarzy zp
+        JOIN Pojazdy p ON p.id = zp.idPojazdy
+        LEFT JOIN Kosztorysy k ON k.id = zp.idKosztorysy
+        WHERE CAST(zp.data AS DATE) = :selected_date
+        AND k.id IS NOT NULL
+        GROUP BY p.nrRejestracyjny, k.id
+        HAVING (STUFF((SELECT DISTINCT ', ' + t.nazwa FROM TowaryKosztorysow tk JOIN Towary t ON t.id = tk.idTowary WHERE tk.idKosztorysy = k.id FOR XML PATH('')), 1, 2, '') IS NOT NULL
+                OR STUFF((SELECT DISTINCT ', ' + u.nazwa FROM UslugiKosztorysow uk JOIN Uslugi u ON u.id = uk.idUslugi WHERE uk.idKosztorysy = k.id FOR XML PATH('')), 1, 2, '') IS NOT NULL)
+    """)
+    
+    try:
+        result = db.execute(query_towary, {"selected_date": selected_date})
+        rows = result.fetchall()
+        
+        pojazdy = []
+        for row in rows:
+            pojazdy.append({
+                'rej': row.rej,
+                'wheels_summary': '',  # Puste
+                'lokalizacje_summary': '',  # Puste
+                'uwagi_summary': 'Brak uwag',
+                'total_opony': 0,
+                'depozyty_count': 0,
+                'depozyty': [{  # Dodaj jeden "fake" depozyt z towarami
+                    'towary_szczegoly': row.towary_szczegoly,
+                    'uslugi_szczegoly': row.uslugi_szczegoly
+                }],
+                'opis_terminarza': ''
+            })
+        
+        return pojazdy
+        
+    except Exception as e:
+        print(f"❌ Błąd get_pojazdy_tylko_towary_terminarz: {e}")
+        return []
     
 def get_pojazdy_grouped_for_terminarz(db: Session, selected_date: str) -> List[Dict[str, Any]]:
     """Grupuje pojazdy - jeden wiersz na pojazd z depozytami do rozwinięcia"""
@@ -258,7 +310,7 @@ def get_zlecenia_na_dzien(db: Session, selected_date: str) -> List[Dict[str, Any
             ko.felgiOpon AS wheels,
             ko.rodzajDepozytu AS rodzaj_opony,
             kpo.glebokoscBieznika AS bieznik,
-            ko.lokalizacjeOpon as lokalizacja,
+            RTRIM(LEFT(ko.lokalizacjeOpon, CHARINDEX('(', ko.lokalizacjeOpon + '(') - 1)) AS lokalizacja,
             kpo.wymianaOpis as opisOponyKPO,
             ko.uwagi as kartaprzechowywalniuwagi,
             ko.numer as numer_z_karty,

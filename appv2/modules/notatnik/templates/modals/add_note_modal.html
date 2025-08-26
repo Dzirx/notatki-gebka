@@ -1,4 +1,5 @@
 <!-- MODAL: DODAJ NOTATKĘ - NOWA WERSJA -->
+<link rel="stylesheet" href="/modules/notatnik/static/css/add-modal.css">
 <div id="noteModal" class="modal">
     <div class="modal-content" style="max-width: 1000px; width: 95%; max-height: 90vh; overflow-y: auto;">
         <span class="close" onclick="closeModal()">&times;</span>
@@ -19,21 +20,170 @@
                 <input type="hidden" id="typ_notatki" name="typ_notatki" required>
             </div>
 
+            <!-- PRACOWNIK (dla wszystkich typów notatek) -->
+            <div class="form-group">
+                <label>Przypisany pracownik (opcjonalnie):</label>
+                <select id="pracownik_id" name="pracownik_id">
+                    <option value="">-- Wybierz pracownika --</option>
+                    <!-- Opcje będą załadowane przez JavaScript -->
+                </select>
+            </div>
+
+            <!-- PRZYPOMNIENIA (dla wszystkich typów notatek) -->
+            <div class="card" style="margin-bottom: 20px;">
+                <h4>⏰ Przypomnienia</h4>
+                <div class="form-group">
+                    <label>Data przypomnienia:</label>
+                    <input type="datetime-local" id="data_przypomnienia" name="data_przypomnienia" placeholder="Wybierz datę i godzinę przypomnienia">
+                    <small style="color: #6c757d; display: block; margin-top: 5px;">Opcjonalnie - ustaw kiedy chcesz otrzymać przypomnienie o tej notatce</small>
+                </div>
+            </div>
+
+            <!-- SEKCJA ZAŁĄCZNIKÓW (ZWINIĘTA) -->
+            <details class="card" style="margin-bottom: 20px; border: 1px solid #ddd; border-radius: 6px; padding: 15px;">
+                <summary style="cursor: pointer; color: #007bff; font-weight: bold; font-size: 1.1em; margin: -15px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+                    📎 Załączniki (kliknij aby rozwinąć)
+                </summary>
+                <div style="margin-top: 15px;">
+                    <div class="form-group">
+                        <label>Dodaj pliki (max 10MB każdy):</label>
+                        <div id="fileUploadZone" class="file-upload-zone">
+                            <div class="upload-content">
+                                <div class="upload-icon">📁</div>
+                                <p>Przeciągnij pliki tutaj lub <span class="upload-link">kliknij aby wybrać</span></p>
+                                <small>Obsługiwane: PDF, obrazy, dokumenty Word/Excel, pliki tekstowe</small>
+                            </div>
+                            <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx,.txt,.csv" style="display: none;">
+                        </div>
+                        <div id="fileList" class="file-list"></div>
+                    </div>
+                </div>
+            </details>
+
             <!-- SEKCJA POJAZDU (ukryta domyślnie) -->
             <div id="vehicleSection" class="hidden">
                 <div class="card" style="margin-bottom: 20px;">
                     <h4>🚗 Dane pojazdu</h4>
+                    <!-- WYBÓR ISTNIEJĄCEGO POJAZDU -->
                     <div class="form-group">
-                        <label>Numer rejestracyjny pojazdu:</label>
+                        <label>Wybierz pojazd z bazy:</label>
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                            <input type="text" id="nr_rejestracyjny" name="nr_rejestracyjny" 
-                                   placeholder="np. GDA55555" style="flex: 1; min-width: 200px;">
+                            <div style="flex: 1; min-width: 200px; position: relative;">
+                                <input type="text" id="searchPojazd" placeholder="Wyszukaj po numerze rejestracyjnym..." 
+                                       style="width: 100%;" onkeyup="debounceSearchVehicle()">
+                                <div id="vehicleSearchResults" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-top: none; max-height: 200px; overflow-y: auto; z-index: 1000; display: none;"></div>
+                                <input type="hidden" id="selectedVehicleId" value="">
+                                <input type="hidden" id="nr_rejestracyjny" name="nr_rejestracyjny" value="">
+                            </div>
                             <button type="button" class="btn btn-info" onclick="pobierzKosztorysyZIntegra()">
                                 📋 Pobierz kosztorysy z integra
                             </button>
                         </div>
+                        <div id="selectedVehicleInfo" style="margin-top: 10px; display: none;">
+                            <!-- Tu będą wyświetlane dane wybranego pojazdu -->
+                        </div>
                     </div>
+                    
+                    <!-- STATUS SPRAWDZANIA W INTEGRZE -->
+                    <div id="vehicleCheckStatus" style="margin-top: 10px; display: none;"></div>
+                    
+                    <!-- WYSZUKIWANIE Z WŁASNEJ BAZY (ZWINIĘTE) -->
+                    <details style="margin-top: 15px; border: 1px solid #ddd; border-radius: 6px; padding: 15px; background: #f8f9fa;">
+                        <summary style="cursor: pointer; color: #007bff; font-weight: bold; font-size: 1.0em; margin: -15px; padding: 15px; background: #e9f4ff; border-radius: 6px;">
+                            🔍 Wyszukaj w lokalnej bazie danych (kliknij aby rozwinąć)
+                        </summary>
+                        <div style="margin-top: 15px;">
+                            <label>Wyszukaj pojazd tylko w lokalnej bazie:</label>
+                            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                                <div style="flex: 1; min-width: 200px; position: relative;">
+                                    <input type="text" id="searchPojazdLocal" placeholder="Wyszukaj w lokalnej bazie..." 
+                                           style="width: 100%; background: #fff3cd; border: 1px solid #ffeaa7;" onkeyup="debounceSearchVehicleLocal()">
+                                    <div id="vehicleSearchResultsLocal" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-top: none; max-height: 200px; overflow-y: auto; z-index: 1000; display: none;"></div>
+                                </div>
+                                <small style="color: #856404; width: 100%; margin-top: 5px;">
+                                    ⚠️ Wyszukuje tylko pojazdy zapisane w lokalnej bazie (bez sprawdzania w systemie Integra)
+                                </small>
+                            </div>
+                            <div id="selectedVehicleInfoLocal" style="margin-top: 10px; display: none; background: #d1ecf1; padding: 10px; border-radius: 4px; border: 1px solid #bee5eb;">
+                                <!-- Tu będą wyświetlane dane wybranego pojazdu z lokalnej bazy -->
+                            </div>
+                        </div>
+                    </details>
                 </div>
+
+                <!-- SEKCJA DODANIA SAMOCHODU (ZWINIĘTA) -->
+                <details class="card" style="margin-bottom: 20px; border: 1px solid #ddd; border-radius: 6px; padding: 15px;">
+                    <summary style="cursor: pointer; color: #007bff; font-weight: bold; font-size: 1.1em; margin: -15px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+                        🚗 Dodaj samochód do bazy (kliknij aby rozwinąć)
+                    </summary>
+                    <div style="margin-top: 15px;">
+                        <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px;">
+                            <div style="flex: 1; min-width: 200px;">
+                                <label>Numer rejestracyjny: <span style="color: red;">*</span></label>
+                                <input type="text" id="carNrRej" placeholder="np. GDA55555" style="text-transform: uppercase;">
+                            </div>
+                            <div style="flex: 1; min-width: 180px;">
+                                <label>Marka: <span style="color: red;">*</span></label>
+                                <input type="text" id="carMarka" placeholder="np. Toyota">
+                            </div>
+                            <div style="flex: 1; min-width: 180px;">
+                                <label>Model: <span style="color: red;">*</span></label>
+                                <input type="text" id="carModel" placeholder="np. Corolla">
+                            </div>
+                            <div style="flex: 1; min-width: 120px;">
+                                <label>Rok produkcji:</label>
+                                <input type="number" id="carRok" placeholder="2020" min="1950" max="2030">
+                            </div>
+                        </div>
+                        
+                        <h5 style="margin: 15px 0 10px 0;">👤 Przypisz do klienta</h5>
+                        <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 2; min-width: 250px;">
+                                <label>Wybierz istniejącego klienta:</label>
+                                <div style="position: relative;">
+                                    <input type="text" id="searchKlient" placeholder="Wyszukaj klienta (nazwa, telefon, NIP)..." style="width: 100%;">
+                                    <div id="klientSearchResults" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-top: none; max-height: 200px; overflow-y: auto; z-index: 1000; display: none;"></div>
+                                    <input type="hidden" id="selectedKlientId" value="">
+                                </div>
+                            </div>
+                            <div>
+                                <button type="button" class="btn btn-success" onclick="addCarToDatabase()" style="white-space: nowrap;">🚗 Dodaj samochód</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Nowy klient -->
+                        <details style="margin-top: 15px;">
+                            <summary style="cursor: pointer; color: #007bff; font-weight: bold;">➕ Lub dodaj nowego klienta</summary>
+                            <div style="margin-top: 15px; padding: 15px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa;">
+                                <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 10px;">
+                                    <div style="flex: 1; min-width: 200px;">
+                                        <label>Imię i nazwisko:</label>
+                                        <input type="text" id="newKlientNazwa" placeholder="Jan Kowalski">
+                                    </div>
+                                    <div style="flex: 1; min-width: 150px;">
+                                        <label>Telefon:</label>
+                                        <input type="text" id="newKlientTelefon" placeholder="123-456-789">
+                                    </div>
+                                    <div style="flex: 1; min-width: 200px;">
+                                        <label>Email (opcjonalnie):</label>
+                                        <input type="email" id="newKlientEmail" placeholder="jan@example.com">
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px;">
+                                    <div style="flex: 1; min-width: 150px;">
+                                        <label>NIP (opcjonalnie):</label>
+                                        <input type="text" id="newKlientNip" placeholder="1234567890">
+                                    </div>
+                                    <div style="flex: 2; min-width: 200px;">
+                                        <label>Nazwa firmy (opcjonalnie):</label>
+                                        <input type="text" id="newKlientFirma" placeholder="Nazwa firmy">
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-primary" onclick="addCarWithNewClient()">👤 Dodaj klienta i samochód</button>
+                            </div>
+                        </details>
+                    </div>
+                </details>
 
                 <!-- SEKCJA KOSZTORYSÓW Z INTEGRA -->
                 <div id="integraSection" class="card hidden" style="margin-bottom: 20px;">
@@ -61,9 +211,12 @@
                     <div style="margin: 20px 0;">
                         <h5>📦 Towary</h5>
                         <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
-                            <select id="selectTowar" style="flex: 1; min-width: 200px;">
-                                <option value="">-- Ładowanie towarów... --</option>
-                            </select>
+                            <div style="flex: 1; min-width: 200px; position: relative;">
+                                <input type="text" id="searchTowar" placeholder="Wyszukaj towar (nazwa lub nr katalogowy)..." style="width: 100%;">
+                                <div id="towarSearchResults" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-top: none; max-height: 200px; overflow-y: auto; z-index: 1000; display: none;"></div>
+                                <input type="hidden" id="selectedTowarId" value="">
+                                <input type="hidden" id="selectedTowarData" value="">
+                            </div>
                             <input type="number" id="towarIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
                             <input type="number" id="towarCena" placeholder="Cena" step="0.01" style="width: 120px;">
                             <button type="button" class="btn btn-success" onclick="addTowarToCost()">+ Dodaj</button>
@@ -72,11 +225,32 @@
                         <!-- WŁASNY TOWAR -->
                         <details style="margin-bottom: 15px;">
                             <summary style="cursor: pointer; color: #007bff;">➕ Dodaj własny towar</summary>
-                            <div style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; display: flex; gap: 10px; flex-wrap: wrap;">
-                                <input type="text" id="customTowarNazwa" placeholder="Nazwa towaru" style="flex: 1; min-width: 150px;">
-                                <input type="number" id="customTowarIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
-                                <input type="number" id="customTowarCena" placeholder="Cena" step="0.01" style="width: 120px;">
-                                <button type="button" class="btn btn-primary" onclick="addCustomTowarToCost()">+ Dodaj własny</button>
+                            <div style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+                                    <input type="text" id="customTowarNazwa" placeholder="Nazwa towaru" style="flex: 2; min-width: 150px;">
+                                    <input type="text" id="customTowarNumer" placeholder="Nr katalogowy" style="flex: 1; min-width: 100px;">
+                                    <input type="text" id="customTowarProducent" placeholder="Producent (opcjonalnie)" style="flex: 1; min-width: 120px;">
+                                </div>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+                                    <select id="customTowarRodzaj" style="flex: 1; min-width: 120px;">
+                                        <option value="">-- Rodzaj opony (opcjonalnie) --</option>
+                                        <option value="letnia">Letnia</option>
+                                        <option value="zimowa">Zimowa</option>
+                                        <option value="całoroczna">Całoroczna</option>
+                                    </select>
+                                    <select id="customTowarTyp" style="flex: 1; min-width: 120px;">
+                                        <option value="">-- Typ opony (opcjonalnie) --</option>
+                                        <option value="osobowa">Osobowa</option>
+                                        <option value="dostawcza">Dostawcza</option>
+                                        <option value="ciężarowa">Ciężarowa</option>
+                                    </select>
+                                    <input type="text" id="customTowarIndeks" placeholder="Indeks nośności (opcjonalnie)" style="flex: 1; min-width: 120px;">
+                                </div>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    <input type="number" id="customTowarIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
+                                    <input type="number" id="customTowarCena" placeholder="Cena" step="0.01" style="width: 120px;">
+                                    <button type="button" class="btn btn-primary" onclick="addCustomTowarToCost()">+ Dodaj własny</button>
+                                </div>
                             </div>
                         </details>
                         
@@ -87,9 +261,12 @@
                     <div style="margin: 20px 0;">
                         <h5>🔧 Usługi</h5>
                         <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
-                            <select id="selectUsluga" style="flex: 1; min-width: 200px;">
-                                <option value="">-- Ładowanie usług... --</option>
-                            </select>
+                            <div style="flex: 1; min-width: 200px; position: relative;">
+                                <input type="text" id="searchUsluga" placeholder="Wyszukaj usługę..." style="width: 100%;">
+                                <div id="uslugaSearchResults" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-top: none; max-height: 200px; overflow-y: auto; z-index: 1000; display: none;"></div>
+                                <input type="hidden" id="selectedUslugaId" value="">
+                                <input type="hidden" id="selectedUslugaData" value="">
+                            </div>
                             <input type="number" id="uslugaIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
                             <input type="number" id="uslugaCena" placeholder="Cena" step="0.01" style="width: 120px;">
                             <button type="button" class="btn btn-success" onclick="addUslugaToCost()">+ Dodaj</button>
@@ -121,7 +298,7 @@
             <div id="noteContentSection" class="hidden">
                 <div class="form-group">
                     <label>Treść notatki:</label>
-                    <textarea name="tresc" id="noteTresc" placeholder="Opisz wykonane prace, ustalone ustalenia lub uwagi..." required style="min-height: 100px;"></textarea>
+                    <textarea name="tresc" id="noteTresc" placeholder="Opisz wykonane prace, ustalone ustalenia lub uwagi..." style="min-height: 100px;"></textarea>
                 </div>
             </div>
 
@@ -140,133 +317,3 @@
         </form>
     </div>
 </div>
-
-<style>
-/* Style dla nowego modala */
-#noteModal .modal-content {
-    margin: 2% auto;  /* Dodaj margines góra/dół */
-}
-
-#noteModal .card {
-    background: #ffffff;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-#noteModal .card h4, #noteModal .card h5 {
-    margin-top: 0;
-    color: #495057;
-    border-bottom: 2px solid #e9ecef;
-    padding-bottom: 8px;
-    margin-bottom: 15px;
-}
-
-#noteModal .form-group {
-    margin-bottom: 15px;
-}
-
-#noteModal .form-group label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: 500;
-    color: #495057;
-}
-
-#noteModal input, #noteModal select, #noteModal textarea {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-    font-size: 14px;
-    box-sizing: border-box;
-}
-
-#noteModal input:focus, #noteModal select:focus, #noteModal textarea:focus {
-    outline: none;
-    border-color: #80bdff;
-    box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
-}
-
-.note-type-btn.active {
-    background-color: #007bff !important;
-    color: white !important;
-    border-color: #007bff !important;
-}
-
-.cost-item {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    padding: 12px;
-    margin-bottom: 8px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.cost-item .item-info {
-    flex: 1;
-}
-
-.cost-item .item-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.integra-kosztorys {
-    background: #e3f2fd;
-    border: 1px solid #2196f3;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 15px;
-}
-
-.integra-kosztorys h5 {
-    margin: 0 0 10px 0;
-    color: #1976d2;
-}
-
-/* Animacje płynnego pokazywania */
-.hidden {
-    display: none !important;
-}
-
-.slide-in {
-    animation: slideIn 0.3s ease-out;
-}
-
-@keyframes slideIn {
-    from { 
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to { 
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Responsywność */
-@media (max-width: 768px) {
-    #noteModal .modal-content {
-        width: 98%;
-        margin: 1% auto;
-    }
-    
-    #noteModal .card {
-        padding: 15px;
-    }
-    
-    #noteModal input, #noteModal select {
-        margin-bottom: 10px;
-    }
-    
-    .cost-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    }
-}
-</style>

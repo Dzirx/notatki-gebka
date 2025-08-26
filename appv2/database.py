@@ -7,7 +7,7 @@ from sqlalchemy.sql import func
 
 # Główna baza - notatki (PostgreSQL)
 DATABASE_URL = "postgresql://postgres:password@localhost:5432/notatki_db"
-
+#DATABASE_URL = "mssql+pyodbc://readwritenotatki:ZAQ!2wsxert@192.168.1.5/notatki_db?driver=ODBC+Driver+17+for+SQL+Server"
 # Druga baza - samochody (SQL Server) - WYŁĄCZONA LOKALNIE
 try:
     # Spróbuj utworzyć połączenie z SQL Server
@@ -39,7 +39,7 @@ Base = declarative_base()
 
 # === DEPENDENCY FUNCTIONS ===
 def get_db():
-    """Dependency dla głównej bazy danych (notatki) - PostgreSQL"""
+    """Dependency dla głównej bazy danych (notatki) - notatki_db"""
     db = SessionLocal()
     try:
         yield db

@@ -176,31 +176,132 @@
                     <!-- TOWARY -->
                     <div class="kosztorys-section">
                         <h4>📦 Towary</h4>
+                        
+                        <!-- WYSZUKIWANIE TOWARÓW -->
+                        <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+                            <h6>🔍 Dodaj towar z bazy</h6>
+                            <div style="position: relative; margin-bottom: 10px;">
+                                <input type="text" id="editSearchTowar" class="form-control" 
+                                       placeholder="Szukaj towaru..." autocomplete="off">
+                                <div id="editTowarSearchResults" style="position: absolute; top: 100%; left: 0; right: 0; 
+                                     background: white; border: 1px solid #ddd; border-radius: 4px; 
+                                     box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 1000; display: none;"></div>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                                <div>
+                                    <label for="editTowarIlosc">Ilość:</label>
+                                    <input type="number" id="editTowarIlosc" class="form-control" value="1" min="1" step="1">
+                                </div>
+                                <div>
+                                    <label for="editTowarCena">Cena:</label>
+                                    <input type="number" id="editTowarCena" class="form-control" value="0" min="0" step="0.01">
+                                </div>
+                                <button type="button" onclick="addSearchedTowar()" class="btn btn-success">+ Dodaj</button>
+                            </div>
+                            
+                            <!-- Hidden fields for selected towar -->
+                            <input type="hidden" id="editSelectedTowarId">
+                            <input type="hidden" id="editSelectedTowarData">
+                        </div>
+                        
                         <div id="editTowarySectionContainer">
                             <div id="editTowaryList">
                                 <!-- Będzie wypełnione przez JavaScript -->
                             </div>
-                            <button type="button" class="btn btn-secondary" onclick="addNewTowarRow()">+ Dodaj towar</button>
+                            
+                            <!-- WŁASNY TOWAR -->
+                            <details style="margin-top: 15px;">
+                                <summary style="cursor: pointer; color: #007bff; font-weight: bold;">➕ Dodaj własny towar</summary>
+                                <div style="margin-top: 10px; padding: 15px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa;">
+                                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+                                        <input type="text" id="editCustomTowarNazwa" placeholder="Nazwa towaru" style="flex: 2; min-width: 150px;" class="form-control">
+                                        <input type="text" id="editCustomTowarNumer" placeholder="Nr katalogowy" style="flex: 1; min-width: 100px;" class="form-control">
+                                        <input type="text" id="editCustomTowarProducent" placeholder="Producent (opcjonalnie)" style="flex: 1; min-width: 120px;" class="form-control">
+                                    </div>
+                                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+                                        <select id="editCustomTowarRodzaj" style="flex: 1; min-width: 120px;" class="form-control">
+                                            <option value="">-- Rodzaj opony (opcjonalnie) --</option>
+                                            <option value="letnia">Letnia</option>
+                                            <option value="zimowa">Zimowa</option>
+                                            <option value="całoroczna">Całoroczna</option>
+                                        </select>
+                                        <select id="editCustomTowarTyp" style="flex: 1; min-width: 120px;" class="form-control">
+                                            <option value="">-- Typ opony (opcjonalnie) --</option>
+                                            <option value="osobowa">Osobowa</option>
+                                            <option value="dostawcza">Dostawcza</option>
+                                            <option value="ciężarowa">Ciężarowa</option>
+                                        </select>
+                                        <input type="text" id="editCustomTowarIndeks" placeholder="Indeks nośności (opcjonalnie)" style="flex: 1; min-width: 120px;" class="form-control">
+                                    </div>
+                                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                        <input type="number" id="editCustomTowarIlosc" placeholder="Ilość" min="1" step="1" value="1" style="width: 100px;" class="form-control">
+                                        <input type="number" id="editCustomTowarCena" placeholder="Cena" step="0.01" min="0" style="width: 120px;" class="form-control">
+                                        <button type="button" class="btn btn-primary" onclick="addCustomTowarToEdit()">+ Dodaj własny</button>
+                                    </div>
+                                </div>
+                            </details>
                         </div>
                     </div>
 
                     <!-- USŁUGI -->
                     <div class="kosztorys-section" style="margin-top: 30px;">
                         <h4>🔧 Usługi</h4>
+                        
+                        <!-- WYSZUKIWANIE USŁUG -->
+                        <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+                            <h6>🔍 Dodaj usługę z bazy</h6>
+                            <div style="position: relative; margin-bottom: 10px;">
+                                <input type="text" id="editSearchUsluga" class="form-control" 
+                                       placeholder="Szukaj usługi..." autocomplete="off">
+                                <div id="editUslugaSearchResults" style="position: absolute; top: 100%; left: 0; right: 0; 
+                                     background: white; border: 1px solid #ddd; border-radius: 4px; 
+                                     box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 1000; display: none;"></div>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                                <div>
+                                    <label for="editUslugaIlosc">Ilość:</label>
+                                    <input type="number" id="editUslugaIlosc" class="form-control" value="1" min="1" step="1">
+                                </div>
+                                <div>
+                                    <label for="editUslugaCena">Cena:</label>
+                                    <input type="number" id="editUslugaCena" class="form-control" value="0" min="0" step="0.01">
+                                </div>
+                                <button type="button" onclick="addSearchedUsluga()" class="btn btn-success">+ Dodaj</button>
+                            </div>
+                            
+                            <!-- Hidden fields for selected usluga -->
+                            <input type="hidden" id="editSelectedUslugaId">
+                            <input type="hidden" id="editSelectedUslugaData">
+                        </div>
+                        
                         <div id="editUslugiSectionContainer">
                             <div id="editUslugiList">
                                 <!-- Będzie wypełnione przez JavaScript -->
                             </div>
-                            <button type="button" class="btn btn-secondary" onclick="addNewUslugaRow()">+ Dodaj usługę</button>
+                            
+                            <!-- WŁASNA USŁUGA -->
+                            <details style="margin-top: 15px;">
+                                <summary style="cursor: pointer; color: #007bff; font-weight: bold;">➕ Dodaj własną usługę</summary>
+                                <div style="margin-top: 10px; padding: 15px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa;">
+                                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                        <input type="text" id="editCustomUslugaNazwa" placeholder="Nazwa usługi" style="flex: 1; min-width: 200px;" class="form-control">
+                                        <input type="number" id="editCustomUslugaIlosc" placeholder="Ilość" min="1" step="1" value="1" style="width: 100px;" class="form-control">
+                                        <input type="number" id="editCustomUslugaCena" placeholder="Cena" step="0.01" min="0" style="width: 120px;" class="form-control">
+                                        <button type="button" class="btn btn-primary" onclick="addCustomUslugaToEdit()">+ Dodaj własną</button>
+                                    </div>
+                                </div>
+                            </details>
                         </div>
                     </div>
 
                     <!-- PODSUMOWANIE -->
-                    <div class="kosztorys-summary" style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
-                        <h4>💰 Podsumowanie</h4>
-                        <div style="display: flex; justify-content: space-between; font-size: 1.2em; font-weight: bold;">
+                    <div class="kosztorys-summary" style="margin-top: 30px; padding: 20px; background: white; color: #28a745; border-radius: 8px; border: 2px solid #28a745;">
+                        <h4 style="margin: 0 0 10px 0; color: #28a745;">💰 Podsumowanie</h4>
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 1.3em; font-weight: bold; color: #28a745;">
                             <span>Łączna kwota:</span>
-                            <span id="editTotalAmount">{{ "%.2f"|format(kosztorys.kwota_calkowita) }} zł</span>
+                            <span id="editTotalAmount" style="background: #f8f9fa; padding: 8px 15px; border-radius: 6px; color: #28a745; border: 1px solid #28a745;">{{ "%.2f"|format(kosztorys.kwota_calkowita) }} zł</span>
                         </div>
                     </div>
                 </div>
@@ -227,6 +328,8 @@
             uslugi: {{ kosztorys.uslugi|tojson if kosztorys.uslugi else '[]' }}
         };
     </script>
+    <script src="/modules/notatnik/static/js/towar-search.js"></script>
+    <script src="/modules/notatnik/static/js/usluga-search.js"></script>
     <script src="/modules/notatnik/static/js/kosztorys-single.js"></script>
 </body>
 </html>

@@ -217,7 +217,7 @@
                                 <input type="hidden" id="selectedTowarId" value="">
                                 <input type="hidden" id="selectedTowarData" value="">
                             </div>
-                            <input type="number" id="towarIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
+                            <input type="number" id="towarIlosc" placeholder="Ilość" step="1" min="1" style="width: 100px;">
                             <input type="number" id="towarCena" placeholder="Cena" step="0.01" style="width: 120px;">
                             <button type="button" class="btn btn-success" onclick="addTowarToCost()">+ Dodaj</button>
                         </div>
@@ -247,7 +247,7 @@
                                     <input type="text" id="customTowarIndeks" placeholder="Indeks nośności (opcjonalnie)" style="flex: 1; min-width: 120px;">
                                 </div>
                                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                    <input type="number" id="customTowarIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
+                                    <input type="number" id="customTowarIlosc" placeholder="Ilość" step="1" min="1" style="width: 100px;">
                                     <input type="number" id="customTowarCena" placeholder="Cena" step="0.01" style="width: 120px;">
                                     <button type="button" class="btn btn-primary" onclick="addCustomTowarToCost()">+ Dodaj własny</button>
                                 </div>
@@ -267,7 +267,7 @@
                                 <input type="hidden" id="selectedUslugaId" value="">
                                 <input type="hidden" id="selectedUslugaData" value="">
                             </div>
-                            <input type="number" id="uslugaIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
+                            <input type="number" id="uslugaIlosc" placeholder="Ilość" step="1" min="1" style="width: 100px;">
                             <input type="number" id="uslugaCena" placeholder="Cena" step="0.01" style="width: 120px;">
                             <button type="button" class="btn btn-success" onclick="addUslugaToCost()">+ Dodaj</button>
                         </div>
@@ -277,7 +277,7 @@
                             <summary style="cursor: pointer; color: #007bff;">➕ Dodaj własną usługę</summary>
                             <div style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; display: flex; gap: 10px; flex-wrap: wrap;">
                                 <input type="text" id="customUslugaNazwa" placeholder="Nazwa usługi" style="flex: 1; min-width: 150px;">
-                                <input type="number" id="customUslugaIlosc" placeholder="Ilość" step="0.01" style="width: 100px;">
+                                <input type="number" id="customUslugaIlosc" placeholder="Ilość" step="1" min="1" style="width: 100px;">
                                 <input type="number" id="customUslugaCena" placeholder="Cena" step="0.01" style="width: 120px;">
                                 <button type="button" class="btn btn-primary" onclick="addCustomUslugaToCost()">+ Dodaj własną</button>
                             </div>

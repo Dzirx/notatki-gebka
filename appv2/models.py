@@ -376,7 +376,7 @@ class Zalacznik(Base):
     nazwa_pliku = Column(String(255), nullable=False)
     rozmiar = Column(Integer, nullable=False)
     typ_mime = Column(String(100), nullable=False)
-    sciezka = Column(String(500), nullable=False)
+    dane = Column(LargeBinary, nullable=False)
     created_at = Column(DateTime, server_default=func.getdate())
     
     # Relacje

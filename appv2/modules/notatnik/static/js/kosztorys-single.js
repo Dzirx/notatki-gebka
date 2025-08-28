@@ -57,7 +57,7 @@ function renderEditTowary() {
     container.innerHTML = editTowaryList.map((towar, index) => `
         <div class="edit-item-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 10px; align-items: center; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 10px;">
             <input type="text" value="${towar.nazwa || ''}" onchange="updateEditTowar(${index}, 'nazwa', this.value)" class="form-control">
-            <input type="number" value="${towar.ilosc || 1}" onchange="updateEditTowar(${index}, 'ilosc', parseFloat(this.value))" class="form-control" step="0.1" min="0.1">
+            <input type="number" value="${towar.ilosc || 1}" onchange="updateEditTowar(${index}, 'ilosc', parseInt(this.value))" class="form-control" step="1" min="1">
             <input type="number" value="${towar.cena || 0}" onchange="updateEditTowar(${index}, 'cena', parseFloat(this.value))" class="form-control" step="0.01" min="0">
             <span style="font-weight: bold;">${((towar.ilosc || 1) * (towar.cena || 0)).toFixed(2)} zł</span>
             <button type="button" data-remove-towar="${index}" class="btn btn-sm btn-danger">🗑️</button>
@@ -87,7 +87,7 @@ function renderEditUslugi() {
     container.innerHTML = editUslugiList.map((usluga, index) => `
         <div class="edit-item-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 10px; align-items: center; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 10px;">
             <input type="text" value="${usluga.nazwa || ''}" onchange="updateEditUsluga(${index}, 'nazwa', this.value)" class="form-control">
-            <input type="number" value="${usluga.ilosc || 1}" onchange="updateEditUsluga(${index}, 'ilosc', parseFloat(this.value))" class="form-control" step="0.1" min="0.1">
+            <input type="number" value="${usluga.ilosc || 1}" onchange="updateEditUsluga(${index}, 'ilosc', parseInt(this.value))" class="form-control" step="1" min="1">
             <input type="number" value="${usluga.cena || 0}" onchange="updateEditUsluga(${index}, 'cena', parseFloat(this.value))" class="form-control" step="0.01" min="0">
             <span style="font-weight: bold;">${((usluga.ilosc || 1) * (usluga.cena || 0)).toFixed(2)} zł</span>
             <button type="button" data-remove-usluga="${index}" class="btn btn-sm btn-danger">🗑️</button>
@@ -128,36 +128,11 @@ async function removeEditTowar(index) {
     if (index >= 0 && index < editTowaryList.length) {
         const towar = editTowaryList[index];
         
-        // Jeśli towar ma ID (już zapisany w bazie), usuń przez API
-        if (towar.kosztorys_towar_id) {
-            try {
-                const kosztorysId = window.kosztorysData?.id;
-                const response = await fetch(`/api/kosztorys/${kosztorysId}/towar/${towar.kosztorys_towar_id}`, {
-                    method: 'DELETE'
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Nie udało się usunąć towaru z bazy danych');
-                }
-                
-                showToast('✅ Towar został usunięty', 'success');
-                
-                // Przeładuj stronę po chwili
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-                
-            } catch (error) {
-                console.error('Błąd usuwania towaru:', error);
-                showToast('❌ Błąd: ' + error.message, 'error');
-                return;
-            }
-        } else {
-            // Towar nie zapisany w bazie - usuń tylko lokalnie
-            editTowaryList.splice(index, 1);
-            renderEditTowary();
-            updateEditTotal();
-        }
+        // Zawsze usuń tylko lokalnie - zmiany będą zapisane dopiero po kliknięciu "Zapisz zmiany"
+        editTowaryList.splice(index, 1);
+        renderEditTowary();
+        updateEditTotal();
+        showToast('Towar usunięty z listy. Kliknij "Zapisz zmiany" aby potwierdzić.', 'info');
     }
 }
 
@@ -166,63 +141,223 @@ async function removeEditUsluga(index) {
     if (index >= 0 && index < editUslugiList.length) {
         const usluga = editUslugiList[index];
         
-        // Jeśli usługa ma ID (już zapisana w bazie), usuń przez API
-        if (usluga.kosztorys_usluga_id) {
-            try {
-                const kosztorysId = window.kosztorysData?.id;
-                const response = await fetch(`/api/kosztorys/${kosztorysId}/usluga/${usluga.kosztorys_usluga_id}`, {
-                    method: 'DELETE'
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Nie udało się usunąć usługi z bazy danych');
-                }
-                
-                showToast('✅ Usługa została usunięta', 'success');
-                
-                // Przeładuj stronę po chwili
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-                
-            } catch (error) {
-                console.error('Błąd usuwania usługi:', error);
-                showToast('❌ Błąd: ' + error.message, 'error');
-                return;
-            }
-        } else {
-            // Usługa nie zapisana w bazie - usuń tylko lokalnie
-            editUslugiList.splice(index, 1);
-            renderEditUslugi();
-            updateEditTotal();
-        }
+        // Zawsze usuń tylko lokalnie - zmiany będą zapisane dopiero po kliknięciu "Zapisz zmiany"
+        editUslugiList.splice(index, 1);
+        renderEditUslugi();
+        updateEditTotal();
+        showToast('Usługa usunięta z listy. Kliknij "Zapisz zmiany" aby potwierdzić.', 'info');
     }
 }
 
-// DODAJ NOWY TOWAR
-function addNewTowarRow() {
+// DODAJ WŁASNY TOWAR Z PEŁNYM FORMULARZEM
+function addCustomTowarToEdit() {
+    const nazwa = document.getElementById('editCustomTowarNazwa').value.trim();
+    const numer = document.getElementById('editCustomTowarNumer').value.trim();
+    const producent = document.getElementById('editCustomTowarProducent').value.trim();
+    const rodzaj = document.getElementById('editCustomTowarRodzaj').value;
+    const typ = document.getElementById('editCustomTowarTyp').value;
+    const indeks = document.getElementById('editCustomTowarIndeks').value.trim();
+    const ilosc = parseInt(document.getElementById('editCustomTowarIlosc').value);
+    const cena = parseFloat(document.getElementById('editCustomTowarCena').value);
+    
+    if (!nazwa) {
+        showToast('Podaj nazwę towaru', 'error');
+        return;
+    }
+    
+    if (ilosc < 1) {
+        showToast('Ilość musi być większa od 0', 'error');
+        return;
+    }
+    
+    if (cena < 0) {
+        showToast('Cena nie może być ujemna', 'error');
+        return;
+    }
+    
+    // Dodaj towar do listy - zapisze się jako 'local' w bazie
     editTowaryList.push({
         id: null,
-        nazwa: 'Nowy towar',
-        ilosc: 1,
-        cena: 0,
+        nazwa: nazwa,
+        numer_katalogowy: numer || null,
+        nazwa_producenta: producent || null,
+        rodzaj_opony: rodzaj || null,
+        typ_opony: typ || null,
+        opona_indeks_nosnosci: indeks || null,
+        ilosc: ilosc,
+        cena: cena,
+        zrodlo: 'local',
+        external_id: null,
         isCustom: true
     });
+    
+    // Wyczyść formularz
+    document.getElementById('editCustomTowarNazwa').value = '';
+    document.getElementById('editCustomTowarNumer').value = '';
+    document.getElementById('editCustomTowarProducent').value = '';
+    document.getElementById('editCustomTowarRodzaj').value = '';
+    document.getElementById('editCustomTowarTyp').value = '';
+    document.getElementById('editCustomTowarIndeks').value = '';
+    document.getElementById('editCustomTowarIlosc').value = '1';
+    document.getElementById('editCustomTowarCena').value = '';
+    
     renderEditTowary();
     updateEditTotal();
+    showToast('✅ Własny towar dodany', 'success');
 }
 
-// DODAJ NOWĄ USŁUGĘ
-function addNewUslugaRow() {
+// DODAJ WYSZUKANY TOWAR
+function addSearchedTowar() {
+    const searchInput = document.getElementById('editSearchTowar');
+    const iloscInput = document.getElementById('editTowarIlosc');
+    const cenaInput = document.getElementById('editTowarCena');
+    const selectedId = document.getElementById('editSelectedTowarId');
+    const selectedData = document.getElementById('editSelectedTowarData');
+    
+    if (!selectedId.value || !selectedData.value) {
+        showToast('Najpierw wyszukaj i wybierz towar', 'error');
+        return;
+    }
+    
+    const ilosc = parseInt(iloscInput.value);
+    const cena = parseFloat(cenaInput.value);
+    
+    if (ilosc < 1) {
+        showToast('Ilość musi być większa od 0', 'error');
+        return;
+    }
+    
+    if (cena < 0) {
+        showToast('Cena nie może być ujemna', 'error');
+        return;
+    }
+    
+    try {
+        const towarData = JSON.parse(selectedData.value);
+        
+        // Dodaj towar do listy
+        editTowaryList.push({
+            id: towarData.id,
+            towar_id: towarData.id, // dla kompatybilności z backendem
+            nazwa: towarData.display || towarData.nazwa,
+            ilosc: ilosc,
+            cena: cena,
+            isCustom: false
+        });
+        
+        // Wyczyść formularz wyszukiwania
+        searchInput.value = '';
+        iloscInput.value = '1';
+        cenaInput.value = '0';
+        selectedId.value = '';
+        selectedData.value = '';
+        
+        renderEditTowary();
+        updateEditTotal();
+        showToast('✅ Towar dodany', 'success');
+        
+    } catch (error) {
+        console.error('Błąd dodawania towaru:', error);
+        showToast('Błąd dodawania towaru', 'error');
+    }
+}
+
+// DODAJ WŁASNĄ USŁUGĘ Z FORMULARZEM
+function addCustomUslugaToEdit() {
+    const nazwa = document.getElementById('editCustomUslugaNazwa').value.trim();
+    const ilosc = parseInt(document.getElementById('editCustomUslugaIlosc').value);
+    const cena = parseFloat(document.getElementById('editCustomUslugaCena').value);
+    
+    if (!nazwa) {
+        showToast('Podaj nazwę usługi', 'error');
+        return;
+    }
+    
+    if (ilosc < 1) {
+        showToast('Ilość musi być większa od 0', 'error');
+        return;
+    }
+    
+    if (cena < 0) {
+        showToast('Cena nie może być ujemna', 'error');
+        return;
+    }
+    
+    // Dodaj usługę do listy - zapisze się jako 'local' w bazie
     editUslugiList.push({
         id: null,
-        nazwa: 'Nowa usługa',
-        ilosc: 1,
-        cena: 0,
+        nazwa: nazwa,
+        ilosc: ilosc,
+        cena: cena,
+        zrodlo: 'local',
+        external_id: null,
         isCustom: true
     });
+    
+    // Wyczyść formularz
+    document.getElementById('editCustomUslugaNazwa').value = '';
+    document.getElementById('editCustomUslugaIlosc').value = '1';
+    document.getElementById('editCustomUslugaCena').value = '';
+    
     renderEditUslugi();
     updateEditTotal();
+    showToast('✅ Własna usługa dodana', 'success');
+}
+
+// DODAJ WYSZUKANĄ USŁUGĘ
+function addSearchedUsluga() {
+    const searchInput = document.getElementById('editSearchUsluga');
+    const iloscInput = document.getElementById('editUslugaIlosc');
+    const cenaInput = document.getElementById('editUslugaCena');
+    const selectedId = document.getElementById('editSelectedUslugaId');
+    const selectedData = document.getElementById('editSelectedUslugaData');
+    
+    if (!selectedId.value || !selectedData.value) {
+        showToast('Najpierw wyszukaj i wybierz usługę', 'error');
+        return;
+    }
+    
+    const ilosc = parseInt(iloscInput.value);
+    const cena = parseFloat(cenaInput.value);
+    
+    if (ilosc < 1) {
+        showToast('Ilość musi być większa od 0', 'error');
+        return;
+    }
+    
+    if (cena < 0) {
+        showToast('Cena nie może być ujemna', 'error');
+        return;
+    }
+    
+    try {
+        const uslugaData = JSON.parse(selectedData.value);
+        
+        // Dodaj usługę do listy
+        editUslugiList.push({
+            id: uslugaData.id,
+            uslugi_id: uslugaData.id, // dla kompatybilności z backendem
+            nazwa: uslugaData.display || uslugaData.nazwa,
+            ilosc: ilosc,
+            cena: cena,
+            isCustom: false
+        });
+        
+        // Wyczyść formularz wyszukiwania
+        searchInput.value = '';
+        iloscInput.value = '1';
+        cenaInput.value = '0';
+        selectedId.value = '';
+        selectedData.value = '';
+        
+        renderEditUslugi();
+        updateEditTotal();
+        showToast('✅ Usługa dodana', 'success');
+        
+    } catch (error) {
+        console.error('Błąd dodawania usługi:', error);
+        showToast('Błąd dodawania usługi', 'error');
+    }
 }
 
 // AKTUALIZUJ ŁĄCZNĄ KWOTĘ
@@ -278,34 +413,52 @@ async function handleEditKosztorysSubmit(e) {
     try {
         showToast('Zapisywanie zmian...', 'info');
         
-        // 1. Usuń stary kosztorys
-        const deleteResponse = await fetch(`/api/kosztorys/${kosztorysId}`, {
-            method: 'DELETE'
+        // Przygotuj dane - usuń kosztorys_towar_id i kosztorys_usluga_id, ale zachowaj id i isCustom
+        const towaryData = editTowaryList.map(towar => {
+            const { kosztorys_towar_id, towar_id, ...cleanTowar } = towar;
+            // Jeśli ma towar_id, użyj go jako id (z bazy danych)
+            if (towar_id && !cleanTowar.isCustom) {
+                cleanTowar.id = towar_id;
+            }
+            // Jeśli nie ma id ani isCustom, oznacz jako custom
+            if (!cleanTowar.id && !cleanTowar.isCustom) {
+                cleanTowar.isCustom = true;
+            }
+            return cleanTowar;
         });
         
-        if (!deleteResponse.ok) {
-            throw new Error('Nie udało się usunąć starego kosztorysu');
-        }
+        const uslugiData = editUslugiList.map(usluga => {
+            const { kosztorys_usluga_id, uslugi_id, ...cleanUsluga } = usluga;
+            // Jeśli ma uslugi_id, użyj go jako id (z bazy danych)
+            if (uslugi_id && !cleanUsluga.isCustom) {
+                cleanUsluga.id = uslugi_id;
+            }
+            // Jeśli nie ma id ani isCustom, oznacz jako custom
+            if (!cleanUsluga.id && !cleanUsluga.isCustom) {
+                cleanUsluga.isCustom = true;
+            }
+            return cleanUsluga;
+        });
         
-        // 2. Utwórz nowy kosztorys z edytowanymi danymi
         const costData = {
             notatka_id: noteId,
             numer_kosztorysu: numer,
             opis: opis,
-            towary: editTowaryList,
-            uslugi: editUslugiList
+            towary: towaryData,
+            uslugi: uslugiData
         };
         
-        const createResponse = await fetch('/api/kosztorys', {
+        // Zaktualizuj kosztorys używając nowego endpointu
+        const updateResponse = await fetch(`/api/edit-kosztorys/${kosztorysId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(costData)
         });
         
-        const result = await createResponse.json();
+        const result = await updateResponse.json();
         
-        if (!createResponse.ok) {
-            throw new Error(result.detail || 'Błąd tworzenia nowego kosztorysu');
+        if (!updateResponse.ok) {
+            throw new Error(result.detail || 'Błąd aktualizacji kosztorysu');
         }
         
         showToast('✅ Kosztorys został zaktualizowany!', 'success');

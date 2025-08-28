@@ -1,81 +1,84 @@
--- Inicjalizacja bazy danych Notatnik Gębka - POPRAWNA STRUKTURA
+CREATE DATABASE notatki_db;
+GO
+USE notatki_db;
+GO
 
 CREATE TABLE klienci (
-    id SERIAL PRIMARY KEY,
-    nazwapelna VARCHAR(255),
-    nr_telefonu VARCHAR(20),
-    email VARCHAR(255),
-    nip VARCHAR(15),
-    nazwa_firmy VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    nazwapelna NVARCHAR(255),
+    nr_telefonu NVARCHAR(20),
+    email NVARCHAR(255),
+    nip NVARCHAR(15),
+    nazwa_firmy NVARCHAR(255),
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE()
 );
 
 CREATE TABLE samochody (
-    id SERIAL PRIMARY KEY,
-    klient_id INTEGER REFERENCES klienci(id) ON DELETE SET NULL,
-    nr_rejestracyjny VARCHAR(50) UNIQUE,
-    marka VARCHAR(100),
-    model VARCHAR(100),
-    rok_produkcji INTEGER,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    klient_id INT REFERENCES klienci(id) ON DELETE SET NULL,
+    nr_rejestracyjny NVARCHAR(50) UNIQUE,
+    marka NVARCHAR(100),
+    model NVARCHAR(100),
+    rok_produkcji INT,
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE()
 );
 
 CREATE TABLE pracownicy (
-    id SERIAL PRIMARY KEY,
-    imie VARCHAR(100) NOT NULL,
-    nazwisko VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    imie NVARCHAR(100) NOT NULL,
+    nazwisko NVARCHAR(100) NOT NULL,
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE()
 );
 
 CREATE TABLE notatki (
-    id SERIAL PRIMARY KEY,
-    samochod_id INTEGER REFERENCES samochody(id) ON DELETE SET NULL,
-    pracownik_id INTEGER REFERENCES pracownicy(id) ON DELETE SET NULL,
-    typ_notatki VARCHAR(20) NOT NULL CHECK (typ_notatki IN ('szybka', 'pojazd')),
-    tresc TEXT NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'nowa' CHECK (status IN ('nowa', 'w_trakcie', 'zakonczona', 'dostarczony', 'klient_poinformowany')),
-    data_dostawy TIMESTAMP,
-    dostawca VARCHAR(255),
-    nr_vat_dot VARCHAR(100),
-    miejsce_prod VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    samochod_id INT REFERENCES samochody(id) ON DELETE SET NULL,
+    pracownik_id INT REFERENCES pracownicy(id) ON DELETE SET NULL,
+    typ_notatki NVARCHAR(20) NOT NULL CHECK (typ_notatki IN ('szybka', 'pojazd')),
+    tresc NTEXT NOT NULL,
+    status NVARCHAR(20) NOT NULL DEFAULT 'nowa' CHECK (status IN ('nowa', 'w_trakcie', 'zakonczona', 'dostarczony', 'klient_poinformowany')),
+    data_dostawy DATETIME2,
+    dostawca NVARCHAR(255),
+    nr_vat_dot NVARCHAR(100),
+    miejsce_prod NVARCHAR(255),
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE()
 );
 
 CREATE TABLE kosztorysy (
-    id SERIAL PRIMARY KEY,
-    notatka_id INTEGER REFERENCES notatki(id) ON DELETE CASCADE,
-    numer_kosztorysu VARCHAR(50),
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    notatka_id INT REFERENCES notatki(id) ON DELETE CASCADE,
+    numer_kosztorysu NVARCHAR(50),
     kwota_calkowita DECIMAL(10,2) DEFAULT 0.00,
-    opis TEXT,
-    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'approved', 'rejected')),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    opis NTEXT,
+    status NVARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'approved', 'rejected')),
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE()
 );
 
 CREATE TABLE przypomnienia (
-    id SERIAL PRIMARY KEY,
-    notatka_id INTEGER NOT NULL REFERENCES notatki(id) ON DELETE CASCADE,
-    data_przypomnienia TIMESTAMP NOT NULL,
-    wyslane INTEGER DEFAULT 0 CHECK (wyslane IN (0, 1)),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    notatka_id INT NOT NULL REFERENCES notatki(id) ON DELETE CASCADE,
+    data_przypomnienia DATETIME2 NOT NULL,
+    wyslane INT DEFAULT 0 CHECK (wyslane IN (0, 1)),
+    created_at DATETIME2 DEFAULT GETDATE()
 );
 
 CREATE TABLE towary (
-    id SERIAL PRIMARY KEY,
-    nazwa VARCHAR(200) NOT NULL,
-    numer_katalogowy VARCHAR(100),
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    nazwa NVARCHAR(200) NOT NULL,
+    numer_katalogowy NVARCHAR(100),
     cena DECIMAL(10,2),
-    nazwa_producenta VARCHAR(200),
-    opona_indeks_nosnosci VARCHAR(10),
-    rodzaj_opony VARCHAR(50),
-    typ_opony VARCHAR(50),
-    zrodlo VARCHAR(20) DEFAULT 'local' CHECK (zrodlo IN ('local', 'integra')),
-    external_id INTEGER,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    nazwa_producenta NVARCHAR(200),
+    opona_indeks_nosnosci NVARCHAR(10),
+    rodzaj_opony NVARCHAR(50),
+    typ_opony NVARCHAR(50),
+    zrodlo NVARCHAR(20) DEFAULT 'local' CHECK (zrodlo IN ('local', 'integra')),
+    external_id INT,
+    created_at DATETIME2 DEFAULT GETDATE()
 );
 
 -- Indeksy dla szybkiego wyszukiwania
@@ -85,12 +88,12 @@ CREATE INDEX idx_towary_external ON towary(external_id, zrodlo);
 CREATE INDEX idx_towary_zrodlo ON towary(zrodlo);
 
 CREATE TABLE uslugi (
-    id SERIAL PRIMARY KEY,
-    nazwa VARCHAR(200) NOT NULL,
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    nazwa NVARCHAR(200) NOT NULL,
     cena DECIMAL(10,2),
-    zrodlo VARCHAR(20) DEFAULT 'local' CHECK (zrodlo IN ('local', 'integra')),
-    external_id INTEGER,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    zrodlo NVARCHAR(20) DEFAULT 'local' CHECK (zrodlo IN ('local', 'integra')),
+    external_id INT,
+    created_at DATETIME2 DEFAULT GETDATE()
 );
 
 -- Indeksy dla usług
@@ -99,31 +102,31 @@ CREATE INDEX idx_uslugi_external ON uslugi(external_id, zrodlo);
 CREATE INDEX idx_uslugi_zrodlo ON uslugi(zrodlo);
 
 CREATE TABLE kosztorysy_towary (
-    id SERIAL PRIMARY KEY,
-    kosztorys_id INTEGER REFERENCES kosztorysy(id) ON DELETE CASCADE,
-    towar_id INTEGER REFERENCES towary(id),
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    kosztorys_id INT REFERENCES kosztorysy(id) ON DELETE CASCADE,
+    towar_id INT REFERENCES towary(id),
     ilosc DECIMAL(10,2) NOT NULL,
     cena DECIMAL(10,2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME2 DEFAULT GETDATE()
 );
 
 CREATE TABLE kosztorysy_uslug (
-    id SERIAL PRIMARY KEY,
-    kosztorys_id INTEGER REFERENCES kosztorysy(id) ON DELETE CASCADE,
-    uslugi_id INTEGER REFERENCES uslugi(id),
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    kosztorys_id INT REFERENCES kosztorysy(id) ON DELETE CASCADE,
+    uslugi_id INT REFERENCES uslugi(id),
     ilosc DECIMAL(10,2) NOT NULL,
     cena  DECIMAL(10,2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME2 DEFAULT GETDATE()
 );
 
 CREATE TABLE zalaczniki (
-    id SERIAL PRIMARY KEY,
-    notatka_id INTEGER REFERENCES notatki(id) ON DELETE CASCADE NOT NULL,
-    nazwa_pliku VARCHAR(255) NOT NULL,
-    rozmiar INTEGER NOT NULL,
-    typ_mime VARCHAR(100) NOT NULL,
-    sciezka VARCHAR(500) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    notatka_id INT REFERENCES notatki(id) ON DELETE CASCADE NOT NULL,
+    nazwa_pliku NVARCHAR(255) NOT NULL,
+    rozmiar INT NOT NULL,
+    typ_mime NVARCHAR(100) NOT NULL,
+    dane VARBINARY(MAX) NOT NULL,
+    created_at DATETIME2 DEFAULT GETDATE()
 );
 
 INSERT INTO klienci (nazwapelna, nr_telefonu, email, nip, nazwa_firmy) VALUES

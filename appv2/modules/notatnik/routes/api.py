@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from sqlalchemy.orm import Session
 from database import get_db, get_samochody_db
-from sqlalchemy import text, or_
+from sqlalchemy import text, or_, Date
 import sys
 
 # Dodaj ścieżkę do głównego katalogu
@@ -693,6 +693,142 @@ def delete_kosztorys_usluga_api(kosztorys_id: int, usluga_kosztorys_id: int, db:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Błąd usuwania usługi: {str(e)}")
 
+@router.post("/edit-kosztorys/{kosztorys_id}")
+async def edit_kosztorys_api(kosztorys_id: int, request: Request, db: Session = Depends(get_db)):
+    """Edytuje istniejący kosztorys"""
+    try:
+        data = await request.json()
+        
+        # Sprawdź czy kosztorys istnieje
+        from models import Kosztorys, KosztorysTowar, KosztorysUsluga, Towar, Usluga
+        kosztorys = db.query(Kosztorys).filter(Kosztorys.id == kosztorys_id).first()
+        if not kosztorys:
+            raise HTTPException(status_code=404, detail="Kosztorys nie znaleziony")
+        
+        # Walidacja danych
+        numer_kosztorysu = data.get("numer_kosztorysu")
+        opis = data.get("opis", "")
+        towary = data.get("towary", [])
+        uslugi = data.get("uslugi", [])
+                
+        if not numer_kosztorysu:
+            raise HTTPException(status_code=400, detail="Brak numeru kosztorysu")
+        if len(towary) == 0 and len(uslugi) == 0:
+            raise HTTPException(status_code=400, detail="Dodaj przynajmniej jeden towar lub usługę")
+            
+        # Walidacja towarów
+        for i, towar in enumerate(towary):
+            if not towar.get('id') and not towar.get('isCustom'):
+                raise HTTPException(status_code=400, detail=f"Towar {i+1}: brak ID lub flagi isCustom")
+            if not towar.get('ilosc') or float(towar.get('ilosc', 0)) <= 0:
+                raise HTTPException(status_code=400, detail=f"Towar {i+1}: nieprawidłowa ilość")
+            if not towar.get('cena') or float(towar.get('cena', 0)) <= 0:
+                raise HTTPException(status_code=400, detail=f"Towar {i+1}: nieprawidłowa cena")
+                
+        # Walidacja usług
+        for i, usluga in enumerate(uslugi):
+            if not usluga.get('id') and not usluga.get('isCustom'):
+                raise HTTPException(status_code=400, detail=f"Usługa {i+1}: brak ID lub flagi isCustom")
+            if not usluga.get('ilosc') or float(usluga.get('ilosc', 0)) <= 0:
+                raise HTTPException(status_code=400, detail=f"Usługa {i+1}: nieprawidłowa ilość")
+            if not usluga.get('cena') or float(usluga.get('cena', 0)) <= 0:
+                raise HTTPException(status_code=400, detail=f"Usługa {i+1}: nieprawidłowa cena")
+        
+        # Usuń stare towary i usługi
+        db.query(KosztorysTowar).filter(KosztorysTowar.kosztorys_id == kosztorys_id).delete()
+        db.query(KosztorysUsluga).filter(KosztorysUsluga.kosztorys_id == kosztorys_id).delete()
+        
+        # Oblicz nową kwotę całkowitą
+        kwota_calkowita = 0.0
+        for towar in towary:
+            kwota_calkowita += float(towar.get('ilosc', 0)) * float(towar.get('cena', 0))
+        for usluga in uslugi:
+            kwota_calkowita += float(usluga.get('ilosc', 0)) * float(usluga.get('cena', 0))
+        
+        # Aktualizuj kosztorys
+        kosztorys.numer_kosztorysu = numer_kosztorysu
+        kosztorys.opis = opis
+        kosztorys.kwota_calkowita = kwota_calkowita
+        
+        # Dodaj nowe towary
+        for towar_data in towary:
+            if towar_data.get('isCustom'):
+                # Własny towar - utwórz nowy
+                custom_towar = Towar(
+                    nazwa=towar_data['nazwa'],
+                    cena=towar_data['cena'],
+                    zrodlo='local',
+                    external_id=None
+                )
+                db.add(custom_towar)
+                db.flush()
+                
+                kosztorys_towar = KosztorysTowar(
+                    kosztorys_id=kosztorys_id,
+                    towar_id=custom_towar.id,
+                    ilosc=towar_data['ilosc'],
+                    cena=towar_data['cena']
+                )
+                db.add(kosztorys_towar)
+            else:
+                # Istniejący towar
+                kosztorys_towar = KosztorysTowar(
+                    kosztorys_id=kosztorys_id,
+                    towar_id=towar_data['id'],
+                    ilosc=towar_data['ilosc'],
+                    cena=towar_data['cena']
+                )
+                db.add(kosztorys_towar)
+        
+        # Dodaj nowe usługi
+        for usluga_data in uslugi:
+            if usluga_data.get('isCustom'):
+                # Własna usługa - utwórz nową
+                custom_usluga = Usluga(
+                    nazwa=usluga_data['nazwa'],
+                    cena=usluga_data['cena'],
+                    zrodlo='local',
+                    external_id=None
+                )
+                db.add(custom_usluga)
+                db.flush()
+                
+                kosztorys_usluga = KosztorysUsluga(
+                    kosztorys_id=kosztorys_id,
+                    uslugi_id=custom_usluga.id,
+                    ilosc=usluga_data['ilosc'],
+                    cena=usluga_data['cena']
+                )
+                db.add(kosztorys_usluga)
+            else:
+                # Istniejąca usługa
+                kosztorys_usluga = KosztorysUsluga(
+                    kosztorys_id=kosztorys_id,
+                    uslugi_id=usluga_data['id'],
+                    ilosc=usluga_data['ilosc'],
+                    cena=usluga_data['cena']
+                )
+                db.add(kosztorys_usluga)
+        
+        # Commit wszystkiego
+        db.commit()
+        
+        return {
+            "success": True,
+            "kosztorys_id": kosztorys_id,
+            "message": f"Kosztorys {numer_kosztorysu} został zaktualizowany"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Błąd w edit_kosztorys_api: {e}")
+        print(f"Dane wejściowe: {data}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Błąd aktualizacji kosztorysu: {str(e)}")
+
 @router.get("/notatka-szczegoly/{notatka_id}")
 def get_notatka_szczegoly(notatka_id: int, db: Session = Depends(get_db)):
     """Pobiera szczegółowe dane notatki z samochodem i klientem"""
@@ -854,29 +990,16 @@ async def upload_file(
         raise HTTPException(status_code=415, detail="Nieobsługiwany typ pliku")
     
     try:
-        # Utwórz folder jeśli nie istnieje
-        from datetime import datetime
-        now = datetime.now()
-        upload_dir = Path(f"notatnik/uploads/{now.year}/{now.month:02d}")
-        upload_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Generuj unikalną nazwę pliku
-        file_extension = Path(file.filename).suffix
-        unique_filename = f"{uuid.uuid4()}{file_extension}"
-        file_path = upload_dir / unique_filename
-        
-        # Zapisz plik
+        # Odczytaj zawartość pliku
         content = await file.read()
-        with open(file_path, "wb") as f:
-            f.write(content)
         
-        # Zapisz w bazie danych
+        # Zapisz plik bezpośrednio w bazie danych jako BLOB
         zalacznik = Zalacznik(
             notatka_id=notatka_id,
             nazwa_pliku=file.filename,
             rozmiar=len(content),
             typ_mime=file.content_type,
-            sciezka=str(file_path)
+            dane=content  # Zapisz dane binarne w bazie
         )
         db.add(zalacznik)
         db.commit()
@@ -891,27 +1014,24 @@ async def upload_file(
         
     except Exception as e:
         db.rollback()
-        # Usuń plik jeśli wystąpił błąd
-        if 'file_path' in locals() and file_path.exists():
-            file_path.unlink()
         raise HTTPException(status_code=500, detail=f"Błąd przesyłania pliku: {str(e)}")
 
 @router.get("/zalacznik/{zalacznik_id}")
 def download_file(zalacznik_id: int, db: Session = Depends(get_db)):
     """Pobiera plik załącznika"""
+    from fastapi.responses import Response
     
     zalacznik = db.query(Zalacznik).filter(Zalacznik.id == zalacznik_id).first()
     if not zalacznik:
         raise HTTPException(status_code=404, detail="Załącznik nie znaleziony")
     
-    file_path = Path(zalacznik.sciezka)
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Plik nie istnieje na serwerze")
-    
-    return FileResponse(
-        path=str(file_path),
-        filename=zalacznik.nazwa_pliku,
-        media_type=zalacznik.typ_mime
+    # Zwróć dane binarne z bazy danych
+    return Response(
+        content=zalacznik.dane,
+        media_type=zalacznik.typ_mime,
+        headers={
+            "Content-Disposition": f"attachment; filename={zalacznik.nazwa_pliku}"
+        }
     )
 
 @router.delete("/zalacznik/{zalacznik_id}")
@@ -923,12 +1043,7 @@ def delete_file(zalacznik_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Załącznik nie znaleziony")
     
     try:
-        # Usuń plik z dysku
-        file_path = Path(zalacznik.sciezka)
-        if file_path.exists():
-            file_path.unlink()
-        
-        # Usuń z bazy
+        # Usuń tylko z bazy danych (nie ma już plików na dysku)
         db.delete(zalacznik)
         db.commit()
         
@@ -1064,7 +1179,7 @@ def get_today_reminders(db: Session = Depends(get_db)):
             Przypomnienie, Notatka.id == Przypomnienie.notatka_id
         ).filter(
             and_(
-                func.date(Przypomnienie.data_przypomnienia) == dzisiaj,
+                func.cast(Przypomnienie.data_przypomnienia, Date) == dzisiaj,
                 Przypomnienie.wyslane == 0
             )
         ).order_by(Przypomnienie.data_przypomnienia)

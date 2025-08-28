@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    environment:
+      SA_PASSWORD: YourStrong!Passw0rd
+      ACCEPT_EULA: Y
+      MSSQL_DB: notatki_db
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+      - ./init.sql:/docker-entrypoint-initdb.d/init-ms.sql
+
+volumes:
+  mssql_data:
+# docker exec -i notatnik-gebka-mssql-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong!Passw0rd' -C < init-ms.sql

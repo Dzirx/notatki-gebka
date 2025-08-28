@@ -6,7 +6,8 @@ from sqlalchemy.sql import func
 # === BAZY DANYCH ===
 
 # Główna baza - notatki (PostgreSQL)
-DATABASE_URL = "postgresql://postgres:password@localhost:5432/notatki_db"
+DATABASE_URL = "mssql+pymssql://sa:YourStrong!Passw0rd@localhost:1433/notatki_db"
+#DATABASE_URL = "postgresql://postgres:password@localhost:5432/notatki_db"
 #DATABASE_URL = "mssql+pyodbc://readwritenotatki:ZAQ!2wsxert@192.168.1.5/notatki_db?driver=ODBC+Driver+17+for+SQL+Server"
 # Druga baza - samochody (SQL Server) - WYŁĄCZONA LOKALNIE
 try:

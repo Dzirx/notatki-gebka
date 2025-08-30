@@ -162,7 +162,7 @@ async def add_notatka(
         try:
             kosztorysy_data = json.loads(importowane_kosztorysy)
             for kosztorys_data in kosztorysy_data:
-                # Utwórz kosztorys w PostgreSQL
+                # Utwórz kosztorys w MS SQL
                 kosztorys = crud.create_kosztorys(
                     db=db,
                     notatka_id=notatka.id,
@@ -174,7 +174,7 @@ async def add_notatka(
                 # DODAJ TOWARY (strukturalnie z ID)
                 towary = kosztorys_data.get('towary', [])
                 for towar_data in towary:
-                    # Zapewnij że towar istnieje w PostgreSQL (upsert)
+                    # Zapewnij że towar istnieje w MS SQL (upsert)
                     towar = crud.get_or_create_towar_by_id(
                         db, 
                         towar_data['id'], 
@@ -235,9 +235,9 @@ async def add_notatka(
         except Exception as e:
             print(f"❌ Błąd dodawania przypomnienia: {e}")
     
-    # Sprawdź czy to AJAX request
-    content_type = request.headers.get("content-type", "")
-    if "application/json" in content_type or request.headers.get("accept", "").startswith("application/json"):
+    # Sprawdź czy to AJAX request (sprawdź Accept header)
+    accept_header = request.headers.get("accept", "")
+    if "application/json" in accept_header:
         return {
             "success": True,
             "notatka_id": notatka.id,

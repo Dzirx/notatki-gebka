@@ -366,13 +366,13 @@ async def sync_towary_i_uslugi(db_local: Session, db_src: Session):
 
         # === USŁUGI ===
         print("🔧 Synchronizuję usługi z Integry...")
-        uslugi_query = text("SELECT id, nazwa, cena FROM Uslugi WHERE nazwa IS NOT NULL")
+        uslugi_query = text("SELECT id, nazwa, cenaBazowaBrutto FROM Uslugi WHERE nazwa IS NOT NULL")
         uslugi = db_src.execute(uslugi_query).fetchall()
         
         for row in uslugi:
             external_id = row.id
             nazwa = row.nazwa
-            cena = float(row.cena) if row.cena else 0.0
+            cena = float(row.cenaBazowaBrutto) if row.cenaBazowaBrutto else 0.0
             
             # Znajdź usługę z Integry po external_id
             existing = db_local.query(Usluga).filter(
@@ -415,22 +415,26 @@ async def sync_towary_i_uslugi(db_local: Session, db_src: Session):
         raise
     
 def get_or_create_towar_by_id(db: Session, towar_id: int, nazwa: str, cena: float):
-    """Znajdź towar po ID lub utwórz z tym ID (lustrzane odbicie)"""
+    """Znajdź towar po external_id lub utwórz nowy z external_id"""
     from models import Towar
     
-    # Sprawdź czy towar istnieje
-    towar = db.query(Towar).filter(Towar.id == towar_id).first()
+    # Sprawdź czy towar z Integry już istnieje (po external_id)
+    towar = db.query(Towar).filter(
+        Towar.external_id == towar_id,
+        Towar.zrodlo == 'integra'
+    ).first()
     
     if not towar:
-        # Utwórz nowy towar z zadanym ID - UŻYJ MERGE!
+        # Utwórz nowy towar z external_id (ID się auto-wygeneruje)
         towar = Towar(
-            id=towar_id,
             nazwa=nazwa,
-            cena=cena
+            cena=cena,
+            zrodlo='integra',
+            external_id=towar_id  # Zapisz oryginalne ID z Integry
         )
-        towar = db.merge(towar)  # ← ZMIANA: merge zamiast add
+        db.add(towar)
         db.flush()  # Wyślij do bazy bez commit
-        print(f"✅ Utworzono towar: {nazwa} (ID: {towar_id})")
+        print(f"✅ Utworzono towar z Integry: {nazwa} (external_id: {towar_id}, local_id: {towar.id})")
     else:
         # Zaktualizuj cenę jeśli się różni
         if float(towar.cena or 0) != cena:
@@ -443,22 +447,26 @@ def get_or_create_towar_by_id(db: Session, towar_id: int, nazwa: str, cena: floa
     return towar
 
 def get_or_create_usluga_by_id(db: Session, usluga_id: int, nazwa: str, cena: float):
-    """Znajdź usługę po ID lub utwórz z tym ID (lustrzane odbicie)"""
+    """Znajdź usługę po external_id lub utwórz nową z external_id"""
     from models import Usluga
     
-    # Sprawdź czy usługa istnieje
-    usluga = db.query(Usluga).filter(Usluga.id == usluga_id).first()
+    # Sprawdź czy usługa z Integry już istnieje (po external_id)
+    usluga = db.query(Usluga).filter(
+        Usluga.external_id == usluga_id,
+        Usluga.zrodlo == 'integra'
+    ).first()
     
     if not usluga:
-        # Utwórz nową usługę z zadanym ID - UŻYJ MERGE!
+        # Utwórz nową usługę z external_id (ID się auto-wygeneruje)
         usluga = Usluga(
-            id=usluga_id,
             nazwa=nazwa,
-            cena=cena
+            cena=cena,
+            zrodlo='integra',
+            external_id=usluga_id  # Zapisz oryginalne ID z Integry
         )
-        usluga = db.merge(usluga)  # ← ZMIANA: merge zamiast add
-        db.flush()  # Wyślij do bazy bez commit
-        print(f"✅ Utworzono usługę: {nazwa} (ID: {usluga_id})")
+        db.add(usluga)
+        db.flush()
+        print(f"✅ Utworzono usługę z Integry: {nazwa} (external_id: {usluga_id}, local_id: {usluga.id})")
     else:
         # Zaktualizuj cenę jeśli się różni
         if float(usluga.cena or 0) != cena:

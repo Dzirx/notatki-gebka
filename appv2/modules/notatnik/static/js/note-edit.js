@@ -536,15 +536,40 @@ async function importFromIntegraEdit() {
         
         data.kosztorysy.forEach((kosztorys, index) => {
             html += `
-                <div style="border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 6px; background: white;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <input type="checkbox" id="edit_integra_${index}" value="${index}">
-                        <label for="edit_integra_${index}" style="cursor: pointer; flex: 1;">
-                            <strong>${kosztorys.numer_kosztorysu}</strong> - ${kosztorys.kwota_kosztorysu.toFixed(2)} zł
+                <div style="border: 1px solid #007bff; margin: 10px 0; border-radius: 6px; background: white; box-shadow: 0 2px 4px rgba(0,123,255,0.1);">
+                    <div style="background: linear-gradient(135deg, #007bff, #0056b3); color: white; padding: 12px; margin: -1px -1px 15px -1px; border-radius: 5px 5px 0 0;">
+                        <label for="edit_integra_${index}" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 15px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" id="edit_integra_${index}" value="${index}" style="transform: scale(1.2);">
+                                <h5 style="margin: 0; font-size: 16px; font-weight: bold;">${kosztorys.numer_kosztorysu}</h5>
+                            </div>
+                            <div style="font-size: 18px; font-weight: bold; color: #fff3e0;">
+                                ${kosztorys.kwota_kosztorysu.toFixed(2)} zł
+                            </div>
                         </label>
                     </div>
-                    <p><strong>Klient:</strong> ${kosztorys.nazwa_klienta}</p>
-                    <p><strong>Towary:</strong> ${kosztorys.towary.length} | <strong>Usługi:</strong> ${kosztorys.uslugi.length}</p>
+                    <div style="padding: 0 15px 15px 15px;">
+                            
+                            <div style="margin-top: 8px; width: 100%;">
+                                <details style="cursor: pointer; width: 100%;">
+                                    <summary style="font-weight: bold; color: #495057; padding: 5px; border-radius: 4px; background: #e9ecef;">📋 Pozycje (${kosztorys.towary.length} towarów, ${kosztorys.uslugi.length} usług)</summary>
+                                    <div style="margin-top: 8px; padding: 12px; background: white; border-radius: 4px; border: 1px solid #e9ecef; width: 100%; box-sizing: border-box;">
+                                        ${kosztorys.towary.length > 0 ? `
+                                            <p style="margin: 0 0 8px 0; font-weight: bold; color: #28a745;">📦 Towary:</p>
+                                            <ul style="margin: 0 0 12px 20px; padding: 0; font-size: 13px;">
+                                                ${kosztorys.towary.map(t => `<li style="margin-bottom: 4px; line-height: 1.4;">${t.nazwa} - ${t.ilosc}x  ${parseFloat(t.cena).toFixed(2)} zł</li>`).join('')}
+                                            </ul>
+                                        ` : ''}
+                                        ${kosztorys.uslugi.length > 0 ? `
+                                            <p style="margin: 0 0 8px 0; font-weight: bold; color: #fd7e14;">🔧 Usługi:</p>
+                                            <ul style="margin: 0 0 8px 20px; padding: 0; font-size: 13px;">
+                                                ${kosztorys.uslugi.map(u => `<li style="margin-bottom: 4px; line-height: 1.4;">${u.nazwa} - ${u.ilosc}x ${parseFloat(u.cena).toFixed(2)} zł</li>`).join('')}
+                                            </ul>
+                                        ` : ''}
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
                 </div>
             `;
         });

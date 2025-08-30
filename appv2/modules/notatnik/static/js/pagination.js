@@ -8,7 +8,7 @@ let currentPage = 1;
 let itemsPerPage = 20;
 let totalNotes = 0;
 let totalPages = 1;
-let allNotes = []; // Przechowuje wszystkie notatki
+let allNotes = []; // Przechowuje wszystkie notatki do paginacji
 let originalFilterFunction = null; // Przechowuje oryginalną funkcję wyszukiwania
 
 // INICJALIZACJA PAGINACJI
@@ -65,13 +65,7 @@ function integratePaginationWithSearch() {
             // Wykonaj oryginalne wyszukiwanie
             originalFilterFunction();
             
-            // Zastosuj filtr toggle po wyszukiwaniu (jeśli istnieje)
-            if (typeof window.showingCompleted !== 'undefined') {
-                applyCompletedFilter();
-            }
-            
-            // Zaktualizuj paginację na podstawie widocznych wierszy
-            updatePaginationAfterSearch();
+            // Nie aktualizuj paginacji przy filtrach statusu - pozwól oryginalnej funkcji działać
         };
         
         console.log('🔗 Paginacja zintegrowana z wyszukiwaniem');
@@ -80,29 +74,7 @@ function integratePaginationWithSearch() {
     }
 }
 
-// AKTUALIZACJA PAGINACJI PO WYSZUKIWANIU
-function updatePaginationAfterSearch() {
-    const visibleRows = document.querySelectorAll('#notesTable tbody tr:not([style*="display: none"])');
-    
-    if (visibleRows.length === 0) {
-        // Jeśli nie ma widocznych wierszy, pokaż pustą stronę
-        allNotes = [];
-        totalNotes = 0;
-    } else {
-        // Zbierz widoczne wiersze do paginacji
-        allNotes = Array.from(visibleRows).map(row => ({
-            element: row.cloneNode(true),
-            searchText: getRowSearchText(row),
-            status: row.getAttribute('data-status') || 'nowa'
-        }));
-        totalNotes = allNotes.length;
-    }
-    
-    currentPage = 1;
-    calculateTotalPages();
-    updatePagination();
-    showPage(1);
-}
+// Funkcja updatePaginationAfterSearch() usunięta - powodowała konflikt z filtrami statusu
 
 // OBLICZANIE LICZBY STRON
 function calculateTotalPages() {

@@ -1369,7 +1369,7 @@ def sprawdz_pojazd_integra(nr_rejestracyjny: str, db_sql: Session = Depends(get_
         if result:
             return {
                 "found": True,
-                "nr_rejestracyjny": result.nrRejestracyjny,
+                "nr_rejestracyjny": result.nr_rejestracyjny,
                 "wlasciciel": result.wlasciciel,
             }
         else:

@@ -309,10 +309,10 @@ function selectStatusFromMenu(noteId, optionElement) {
         'nowa': '🔵',
         'w_trakcie': '🟡',
         'zakonczona': '🟢',
-        'anulowana': '🔴',
-        'oczekuje': '🟠',
         'dostarczony': '🟠',
-        'klient_poinformowany': '🔴'
+        'klient_poinformowany': '🔴',
+        'niekompletne': '🟨',
+        'wprowadzona_do_programu': '✅'
     };
     
     const emoji = statusEmojis[status] || '❓'; // Fallback emoji jeśli status nie istnieje

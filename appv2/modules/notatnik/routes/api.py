@@ -874,7 +874,7 @@ async def update_notatka_status(notatka_id: int, request: Request, db: Session =
         new_status = data.get("status")
         
         # Walidacja statusu
-        allowed_statuses = ['nowa', 'w_trakcie', 'zakonczona', 'dostarczony', 'klient_poinformowany']
+        allowed_statuses = ['nowa', 'w_trakcie', 'zakonczona', 'dostarczony', 'klient_poinformowany', 'niekompletne', 'wprowadzona_do_programu']
         if new_status not in allowed_statuses:
             raise HTTPException(status_code=400, detail="Nieprawidłowy status")
         

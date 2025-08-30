@@ -247,7 +247,7 @@ class Notatka(Base):
     pracownik_id = Column(Integer, ForeignKey("pracownicy.id"), nullable=True)
     typ_notatki = Column(String(20), nullable=False)
     tresc = Column(Text, nullable=False)
-    status = Column(String(20), default="nowa")
+    status = Column(String(30), default="nowa")
     data_dostawy = Column(DateTime, nullable=True)
     dostawca = Column(String(255), nullable=True)
     nr_vat_dot = Column(String(100), nullable=True)
@@ -257,7 +257,7 @@ class Notatka(Base):
     
     __table_args__ = (
         CheckConstraint("typ_notatki IN ('szybka', 'pojazd')", name="check_typ_notatki"),
-        CheckConstraint("status IN ('nowa', 'w_trakcie', 'zakonczona', 'dostarczony', 'klient_poinformowany')", name="check_status_notatki"),
+        CheckConstraint("status IN ('nowa', 'w_trakcie', 'zakonczona', 'dostarczony', 'klient_poinformowany', 'niekompletne', 'wprowadzona_do_programu')", name="check_status_notatki"),
     )
     
     # Relacje

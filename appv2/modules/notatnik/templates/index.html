@@ -104,6 +104,14 @@
                                      data-status="klient_poinformowany" data-text="Klient poinformowany" onclick="selectStatusFromMenu({{ notatka.id }}, this)">
                                     🔴 Klient poinformowany
                                 </div>
+                                <div class="status-option {% if notatka.status == 'niekompletne' %}current{% endif %}" 
+                                     data-status="niekompletne" data-text="Niekompletne" onclick="selectStatusFromMenu({{ notatka.id }}, this)">
+                                    🟨 Niekompletne
+                                </div>
+                                <div class="status-option {% if notatka.status == 'wprowadzona_do_programu' %}current{% endif %}" 
+                                     data-status="wprowadzona_do_programu" data-text="Wprowadzona do programu" onclick="selectStatusFromMenu({{ notatka.id }}, this)">
+                                    ✅ Wprowadzona do programu
+                                </div>
                             </div>
                         </div>
                     </td>

@@ -551,7 +551,7 @@ def update_notatka_status(db: Session, notatka_id: int, new_status: str):
             return None
         
         # Walidacja statusu
-        allowed_statuses = ['nowa', 'w_trakcie', 'zakonczona', 'anulowana', 'oczekuje']
+        allowed_statuses = ['nowa', 'w_trakcie', 'zakonczona', 'dostarczony', 'klient_poinformowany', 'niekompletne', 'wprowadzona_do_programu']
         if new_status not in allowed_statuses:
             raise ValueError(f"Nieprawidłowy status: {new_status}")
         

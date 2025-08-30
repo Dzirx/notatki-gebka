@@ -38,14 +38,19 @@ function selectNoteType(type) {
     
     // Pokaż odpowiednie sekcje
     if (type === 'szybka') {
-        // Tylko treść notatki
-        showSection('noteContentSection');
+        // Szybka notatka - treść na początku + załączniki i przypomnienia
+        showSection('quickContentSection');
         hideSection('vehicleSection');
+        hideSection('vehicleContentSection');
+        showSection('attachmentsRemindersSection');
         showSection('actionButtons');
+        
     } else if (type === 'pojazd') {
-        // Wszystkie sekcje pojazdu
+        // Notatka do pojazdu - pojazd, potem treść, potem załączniki
+        hideSection('quickContentSection');
         showSection('vehicleSection');
-        showSection('noteContentSection');
+        showSection('vehicleContentSection');
+        showSection('attachmentsRemindersSection');
         showSection('actionButtons');
         
         // Towary i usługi ładowane są przez wyszukiwarki
@@ -511,20 +516,24 @@ function resetModalForm() {
     // Reset podstawowych pól
     const typNotatki = document.getElementById('typ_notatki');
     const nrRej = document.getElementById('nr_rejestracyjny');
-    const noteTresc = document.getElementById('noteTresc');
+    const quickNoteTresc = document.getElementById('quickNoteTresc');
+    const vehicleNoteTresc = document.getElementById('vehicleNoteTresc');
     const customCostNumber = document.getElementById('customCostNumber');
     const customCostDescription = document.getElementById('customCostDescription');
     
     if (typNotatki) typNotatki.value = '';
     if (nrRej) nrRej.value = '';
-    if (noteTresc) noteTresc.value = '';
+    if (quickNoteTresc) quickNoteTresc.value = '';
+    if (vehicleNoteTresc) vehicleNoteTresc.value = '';
     if (customCostNumber) customCostNumber.value = '';
     if (customCostDescription) customCostDescription.value = '';
     
     // Ukryj wszystkie sekcje
     hideSection('vehicleSection');
     hideSection('integraSection');
-    hideSection('noteContentSection');
+    hideSection('quickContentSection');
+    hideSection('vehicleContentSection');
+    hideSection('attachmentsRemindersSection');
     hideSection('actionButtons');
     
     // Reset ukrytych pól
@@ -662,6 +671,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
         form.addEventListener('submit', async function(e) {
             e.preventDefault(); // Zatrzymaj normalne wysłanie formularza
+            
+            // Skopiuj treść z odpowiedniego pola do głównego pola "tresc"
+            const typNotatki = document.getElementById('typ_notatki').value;
+            const quickTresc = document.getElementById('quickNoteTresc');
+            const vehicleTresc = document.getElementById('vehicleNoteTresc');
+            
+            // Utwórz ukryte pole "tresc" jeśli nie istnieje
+            let mainTrescField = document.querySelector('input[name="tresc"], textarea[name="tresc"]');
+            if (!mainTrescField) {
+                mainTrescField = document.createElement('input');
+                mainTrescField.type = 'hidden';
+                mainTrescField.name = 'tresc';
+                form.appendChild(mainTrescField);
+            }
+            
+            // Skopiuj odpowiednią treść
+            if (typNotatki === 'szybka' && quickTresc) {
+                mainTrescField.value = quickTresc.value;
+            } else if (typNotatki === 'pojazd' && vehicleTresc) {
+                mainTrescField.value = vehicleTresc.value;
+            }
             
             // Przygotuj dane własnego kosztorysu jeśli został utworzony
             if (window.selectedTowary.length > 0 || window.selectedUslugi.length > 0) {

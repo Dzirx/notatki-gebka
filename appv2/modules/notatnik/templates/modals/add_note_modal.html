@@ -29,36 +29,15 @@
                 </select>
             </div>
 
-            <!-- PRZYPOMNIENIA (dla wszystkich typów notatek) -->
-            <div class="card" style="margin-bottom: 20px;">
-                <h4>⏰ Przypomnienia</h4>
-                <div class="form-group">
-                    <label>Data przypomnienia:</label>
-                    <input type="datetime-local" id="data_przypomnienia" name="data_przypomnienia" placeholder="Wybierz datę i godzinę przypomnienia">
-                    <small style="color: #6c757d; display: block; margin-top: 5px;">Opcjonalnie - ustaw kiedy chcesz otrzymać przypomnienie o tej notatce</small>
-                </div>
-            </div>
-
-            <!-- SEKCJA ZAŁĄCZNIKÓW (ZWINIĘTA) -->
-            <details class="card" style="margin-bottom: 20px; border: 1px solid #ddd; border-radius: 6px; padding: 15px;">
-                <summary style="cursor: pointer; color: #007bff; font-weight: bold; font-size: 1.1em; margin: -15px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
-                    📎 Załączniki (kliknij aby rozwinąć)
-                </summary>
-                <div style="margin-top: 15px;">
+            <!-- TREŚĆ SZYBKIEJ NOTATKI (pokazywana tylko dla szybkich notatek) -->
+            <div id="quickContentSection" class="hidden">
+                <div class="card" style="margin-bottom: 20px;">
+                    <h4 id="quickContentTitle">⚡ Treść szybkiej notatki</h4>
                     <div class="form-group">
-                        <label>Dodaj pliki (max 10MB każdy):</label>
-                        <div id="fileUploadZone" class="file-upload-zone">
-                            <div class="upload-content">
-                                <div class="upload-icon">📁</div>
-                                <p>Przeciągnij pliki tutaj lub <span class="upload-link">kliknij aby wybrać</span></p>
-                                <small>Obsługiwane: PDF, obrazy, dokumenty Word/Excel, pliki tekstowe</small>
-                            </div>
-                            <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx,.txt,.csv" style="display: none;">
-                        </div>
-                        <div id="fileList" class="file-list"></div>
+                        <textarea id="quickNoteTresc" placeholder="Wpisz szybką notatkę..." style="min-height: 100px;"></textarea>
                     </div>
                 </div>
-            </details>
+            </div>
 
             <!-- SEKCJA POJAZDU (ukryta domyślnie) -->
             <div id="vehicleSection" class="hidden">
@@ -184,11 +163,20 @@
                         </details>
                     </div>
                 </details>
-
+                
+                <!-- TREŚĆ NOTATKI DO POJAZDU (pokazywana tylko dla notatek do pojazdu) -->
+                <div id="vehicleContentSection" class="hidden">
+                    <div class="card" style="margin-bottom: 20px;">
+                        <h4 id="vehicleContentTitle">📝 Treść notatki do pojazdu</h4>
+                        <div class="form-group">
+                            <textarea name="tresc" id="vehicleNoteTresc" placeholder="Opisz wykonane prace, ustalone ustalenia lub uwagi..." style="min-height: 100px;"></textarea>
+                        </div>
+                    </div>
+                </div>
                 <!-- SEKCJA KOSZTORYSÓW Z INTEGRA -->
-                <div id="integraSection" class="card hidden" style="margin-bottom: 20px;">
+                <div id="integraSection" class="card hidden" style="margin-bottom: 20px; padding: 15px; border: 1px solid #dee2e6; border-radius: 8px;">
                     <h4>📥 Kosztorysy z systemu integra</h4>
-                    <div id="integraResults">
+                    <div id="integraResults" style="max-height: 400px; overflow-y: auto; margin-top: 10px;">
                         <!-- Tutaj będą wyniki z integra -->
                     </div>
                 </div>
@@ -294,11 +282,33 @@
                 </div>
             </div>
 
-            <!-- TREŚĆ NOTATKI (zawsze na końcu) -->
-            <div id="noteContentSection" class="hidden">
-                <div class="form-group">
-                    <label>Treść notatki:</label>
-                    <textarea name="tresc" id="noteTresc" placeholder="Opisz wykonane prace, ustalone ustalenia lub uwagi..." style="min-height: 100px;"></textarea>
+            <!-- PRZYPOMNIENIA I ZAŁĄCZNIKI - NA KOŃCU (ukryte domyślnie) -->
+            <div id="attachmentsRemindersSection" class="hidden" style="display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; align-items: stretch;">
+                <!-- ZAŁĄCZNIKI (lewa kolumna) -->
+                <div style="flex: 1; min-width: 300px;">
+                    <div class="card" style="border: 1px solid #ddd; border-radius: 6px; padding: 15px; height: 100%;">
+                        <h4>📎 Załączniki</h4>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <div id="fileUploadZone" class="file-upload-zone" style="min-height: 40px; padding: 15px;">
+                                <div class="upload-content">
+                                    <p style="margin: 5px 0;">Przeciągnij pliki tutaj lub <span class="upload-link">kliknij aby wybrać</span></p>
+                                </div>
+                                <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx,.txt,.csv" style="display: none;">
+                            </div>
+                            <div id="fileList" class="file-list"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- PRZYPOMNIENIA (prawa kolumna) -->
+                <div style="flex: 1; min-width: 300px;">
+                    <div class="card" style="border: 1px solid #ddd; border-radius: 6px; padding: 15px; height: 100%;">
+                        <h4>⏰ Przypomnienia</h4>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>Data przypomnienia:</label>
+                            <input type="datetime-local" id="data_przypomnienia" name="data_przypomnienia" placeholder="Wybierz datę i godzinę przypomnienia">
+                        </div>
+                    </div>
                 </div>
             </div>
 

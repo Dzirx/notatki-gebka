@@ -874,7 +874,7 @@ async def update_notatka_status(notatka_id: int, request: Request, db: Session =
         new_status = data.get("status")
         
         # Walidacja statusu
-        allowed_statuses = ['nowa', 'w_trakcie', 'zakonczona', 'dostarczony', 'klient_poinformowany']
+        allowed_statuses = ['nowa', 'w_trakcie', 'zakonczona', 'dostarczony', 'klient_poinformowany', 'niekompletne', 'wprowadzona_do_programu']
         if new_status not in allowed_statuses:
             raise HTTPException(status_code=400, detail="Nieprawidłowy status")
         
@@ -1369,7 +1369,7 @@ def sprawdz_pojazd_integra(nr_rejestracyjny: str, db_sql: Session = Depends(get_
         if result:
             return {
                 "found": True,
-                "nr_rejestracyjny": result.nrRejestracyjny,
+                "nr_rejestracyjny": result.nr_rejestracyjny,
                 "wlasciciel": result.wlasciciel,
             }
         else:

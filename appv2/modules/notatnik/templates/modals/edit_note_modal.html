@@ -24,50 +24,6 @@
                 </div>
             </div>
 
-            <!-- PRZYPOMNIENIA -->
-            <div class="card" style="margin-bottom: 20px;">
-                <h4>⏰ Przypomnienia</h4>
-                
-                <!-- Istniejące przypomnienia -->
-                <div id="editExistingReminders">
-                    <p style="color: #6c757d; font-style: italic;">Ładowanie przypomień...</p>
-                </div>
-                
-                <!-- Dodaj nowe przypomnienie -->
-                <div class="form-group" style="margin-top: 15px;">
-                    <label>Dodaj nowe przypomnienie:</label>
-                    <input type="datetime-local" id="edit_data_przypomnienia" placeholder="Wybierz datę i godzinę przypomnienia">
-                    <small style="color: #6c757d; display: block; margin-top: 5px;">Opcjonalnie - ustaw kiedy chcesz otrzymać przypomnienie o tej notatce</small>
-                    <button type="button" class="btn btn-primary" onclick="addReminder()" style="margin-top: 10px;">⏰ Dodaj przypomnienie</button>
-                </div>
-            </div>
-
-            <!-- SEKCJA ZAŁĄCZNIKÓW (ZWINIĘTA) -->
-            <details class="card" style="margin-bottom: 20px; border: 1px solid #ddd; border-radius: 6px; padding: 15px;">
-                <summary style="cursor: pointer; color: #007bff; font-weight: bold; font-size: 1.1em; margin: -15px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
-                    📎 Załączniki (kliknij aby rozwinąć)
-                </summary>
-                <div style="margin-top: 15px;">
-                    <!-- Istniejące załączniki -->
-                    <div id="editExistingAttachments">
-                        <p style="color: #6c757d; font-style: italic;">Ładowanie...</p>
-                    </div>
-                    
-                    <!-- Upload nowych plików -->
-                    <div class="form-group" style="margin-top: 15px;">
-                        <label>Dodaj nowe pliki (max 10MB każdy):</label>
-                        <div id="editFileUploadZone" class="file-upload-zone">
-                            <div class="upload-content">
-                                <div class="upload-icon">📁</div>
-                                <p>Przeciągnij pliki tutaj lub <span class="upload-link">kliknij aby rozwinąć</span></p>
-                                <small>Obsługiwane: PDF, obrazy, dokumenty Word/Excel, pliki tekstowe</small>
-                            </div>
-                            <input type="file" id="editFileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx,.txt,.csv" style="display: none;">
-                        </div>
-                        <div id="editFileList" class="file-list"></div>
-                    </div>
-                </div>
-            </details>
 
             <!-- PRZYCISK IMPORTU Z INTEGRA (tylko dla pojazdów) -->
             <div id="editImportSection" class="card" style="margin-bottom: 20px; display: none;">
@@ -184,6 +140,51 @@
                     <h5>💵 Podsumowanie nowego kosztorysu</h5>
                     <div id="editCostTotal" style="font-size: 1.2em; font-weight: bold; color: #28a745;"></div>
                     <button type="button" class="btn btn-success" onclick="saveNewCostEstimate()">💾 Zapisz kosztorys</button>
+                </div>
+            </div>
+
+            <!-- PRZYPOMNIENIA I ZAŁĄCZNIKI - OBOK SIEBIE NA DOLE -->
+            <div style="display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; align-items: stretch;">
+                <!-- ZAŁĄCZNIKI (lewa kolumna) -->
+                <div style="flex: 1; min-width: 300px;">
+                    <div class="card" style="border: 1px solid #ddd; border-radius: 6px; padding: 15px; height: 100%;">
+                        <h4>📎 Załączniki</h4>
+                        <!-- Istniejące załączniki -->
+                        <div id="editExistingAttachments" style="margin-bottom: 15px;">
+                            <p style="color: #6c757d; font-style: italic;">Ładowanie...</p>
+                        </div>
+                        
+                        <!-- Upload nowych plików -->
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>Dodaj nowe pliki (max 10MB każdy):</label>
+                            <div id="editFileUploadZone" class="file-upload-zone" style="min-height: 40px; padding: 15px;">
+                                <div class="upload-content">
+                                    <p style="margin: 5px 0;">Przeciągnij pliki tutaj lub <span class="upload-link">kliknij aby wybrać</span></p>
+                                </div>
+                                <input type="file" id="editFileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx,.txt,.csv" style="display: none;">
+                            </div>
+                            <div id="editFileList" class="file-list"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- PRZYPOMNIENIA (prawa kolumna) -->
+                <div style="flex: 1; min-width: 300px;">
+                    <div class="card" style="border: 1px solid #ddd; border-radius: 6px; padding: 15px; height: 100%;">
+                        <h4>⏰ Przypomnienia</h4>
+                        
+                        <!-- Istniejące przypomnienia -->
+                        <div id="editExistingReminders" style="margin-bottom: 15px;">
+                            <p style="color: #6c757d; font-style: italic;">Ładowanie przypomień...</p>
+                        </div>
+                        
+                        <!-- Dodaj nowe przypomnienie -->
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>Dodaj nowe przypomnienie:</label>
+                            <input type="datetime-local" id="edit_data_przypomnienia" placeholder="Wybierz datę i godzinę przypomnienia">
+                            <button type="button" class="btn btn-primary" onclick="addReminder()" style="margin-top: 10px;">⏰ Dodaj przypomnienie</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 

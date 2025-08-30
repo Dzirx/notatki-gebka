@@ -36,7 +36,7 @@ CREATE TABLE notatki (
     pracownik_id INTEGER REFERENCES pracownicy(id) ON DELETE SET NULL,
     typ_notatki VARCHAR(20) NOT NULL CHECK (typ_notatki IN ('szybka', 'pojazd')),
     tresc TEXT NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'nowa' CHECK (status IN ('nowa', 'w_trakcie', 'zakonczona', 'dostarczony', 'klient_poinformowany')),
+    status VARCHAR(30) NOT NULL DEFAULT 'nowa' CHECK (status IN ('nowa', 'w_trakcie', 'zakonczona', 'dostarczony', 'klient_poinformowany', 'niekompletne', 'wprowadzona_do_programu')),
     data_dostawy TIMESTAMP,
     dostawca VARCHAR(255),
     nr_vat_dot VARCHAR(100),

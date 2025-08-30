@@ -38,14 +38,19 @@ function selectNoteType(type) {
     
     // Pokaż odpowiednie sekcje
     if (type === 'szybka') {
-        // Tylko treść notatki
-        showSection('noteContentSection');
+        // Szybka notatka - treść na początku + załączniki i przypomnienia
+        showSection('quickContentSection');
         hideSection('vehicleSection');
+        hideSection('vehicleContentSection');
+        showSection('attachmentsRemindersSection');
         showSection('actionButtons');
+        
     } else if (type === 'pojazd') {
-        // Wszystkie sekcje pojazdu
+        // Notatka do pojazdu - pojazd, potem treść, potem załączniki
+        hideSection('quickContentSection');
         showSection('vehicleSection');
-        showSection('noteContentSection');
+        showSection('vehicleContentSection');
+        showSection('attachmentsRemindersSection');
         showSection('actionButtons');
         
         // Towary i usługi ładowane są przez wyszukiwarki
@@ -391,7 +396,7 @@ async function pobierzKosztorysyZIntegra() {
         
         // === POKAŻ INFO O SYNCHRONIZACJI ===
         if (data.sync_result) {
-            showSyncResult(data.sync_result);
+            console.log('Sync result:', data.sync_result);
         }
         
         if (data.kosztorysy.length === 0) {
@@ -405,35 +410,41 @@ async function pobierzKosztorysyZIntegra() {
         
         data.kosztorysy.forEach((kosztorys, index) => {
             html += `
-                <div class="integra-kosztorys" style="border: 1px solid #ddd; border-radius: 6px; padding: 12px; margin-bottom: 15px; background: #f9f9f9;">
-                    <div style="display: flex; align-items: flex-start; gap: 12px;">
-                        <input type="checkbox" id="integra_${index}" value="${index}" onchange="toggleIntegraKosztorys(${index})" style="margin-top: 3px;">
-                        <div style="flex: 1;">
-                            <label for="integra_${index}" style="cursor: pointer; display: block; margin-bottom: 8px;">
-                                <h5 style="margin: 0; color: #007bff;">${kosztorys.numer_kosztorysu} - ${kosztorys.kwota_kosztorysu.toFixed(2)} zł</h5>
-                            </label>
-                            <p style="margin: 4px 0; font-size: 14px;"><strong>Klient:</strong> ${kosztorys.nazwa_klienta}</p>
+                <div class="integra-kosztorys" style="border: 1px solid #ddd; border-radius: 6px; margin-bottom: 15px; background: #f9f9f9; width: 100%; box-sizing: border-box;">
+                    <!-- NAGŁÓWEK KOSZTORYSU W JEDNEJ LINII -->
+                    <div style="background: linear-gradient(135deg, #007bff, #0056b3); color: white; padding: 12px; margin: -1px -1px 15px -1px; border-radius: 5px 5px 0 0;">
+                        <label for="integra_${index}" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 15px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" id="integra_${index}" value="${index}" onchange="toggleIntegraKosztorys(${index})" style="transform: scale(1.2);">
+                                <h5 style="margin: 0; font-size: 16px; font-weight: bold;">${kosztorys.numer_kosztorysu}</h5>
+                            </div>
+                            <div style="font-size: 18px; font-weight: bold; color: #fff3e0;">
+                                ${kosztorys.kwota_kosztorysu.toFixed(2)} zł
+                            </div>
+                        </label>
+                    </div>
+                    <!-- ZAWARTOŚĆ KOSZTORYSU -->
+                    <div style="padding: 0 15px 15px 15px;">
                             
-                            <div style="margin-top: 8px;">
-                                <details style="cursor: pointer;">
-                                    <summary style="font-weight: bold; color: #495057;">📋 Pozycje (${kosztorys.towary.length} towarów, ${kosztorys.uslugi.length} usług)</summary>
-                                    <div style="margin-top: 8px; padding: 8px; background: white; border-radius: 4px; border: 1px solid #e9ecef;">
+                            <div style="margin-top: 8px; width: 100%;">
+                                <details style="cursor: pointer; width: 100%;">
+                                    <summary style="font-weight: bold; color: #495057; padding: 5px; border-radius: 4px; background: #e9ecef;">📋 Pozycje (${kosztorys.towary.length} towarów, ${kosztorys.uslugi.length} usług)</summary>
+                                    <div style="margin-top: 8px; padding: 12px; background: white; border-radius: 4px; border: 1px solid #e9ecef; width: 100%; box-sizing: border-box;">
                                         ${kosztorys.towary.length > 0 ? `
-                                            <p style="margin: 4px 0; font-weight: bold; color: #28a745;">📦 Towary:</p>
-                                            <ul style="margin: 4px 0 12px 20px; font-size: 13px;">
-                                                ${kosztorys.towary.map(t => `<li>${t.nazwa_towaru} - ${t.ilosc}x à ${parseFloat(t.cena_towaru).toFixed(2)} zł</li>`).join('')}
+                                            <p style="margin: 0 0 8px 0; font-weight: bold; color: #28a745;">📦 Towary:</p>
+                                            <ul style="margin: 0 0 12px 20px; padding: 0; font-size: 13px;">
+                                                ${kosztorys.towary.map(t => `<li style="margin-bottom: 4px; line-height: 1.4;">${t.nazwa} - ${t.ilosc}x  ${parseFloat(t.cena).toFixed(2)} zł</li>`).join('')}
                                             </ul>
                                         ` : ''}
                                         ${kosztorys.uslugi.length > 0 ? `
-                                            <p style="margin: 4px 0; font-weight: bold; color: #fd7e14;">🔧 Usługi:</p>
-                                            <ul style="margin: 4px 0; font-size: 13px;">
-                                                ${kosztorys.uslugi.map(u => `<li>${u.nazwa_uslugi} - ${u.ilosc}x à ${parseFloat(u.cena_uslugi).toFixed(2)} zł</li>`).join('')}
+                                            <p style="margin: 0 0 8px 0; font-weight: bold; color: #fd7e14;">🔧 Usługi:</p>
+                                            <ul style="margin: 0 0 8px 20px; padding: 0; font-size: 13px;">
+                                                ${kosztorys.uslugi.map(u => `<li style="margin-bottom: 4px; line-height: 1.4;">${u.nazwa} - ${u.ilosc}x  ${parseFloat(u.cena).toFixed(2)} zł</li>`).join('')}
                                             </ul>
                                         ` : ''}
                                     </div>
                                 </details>
                             </div>
-                        </div>
                     </div>
                 </div>
             `;
@@ -505,20 +516,24 @@ function resetModalForm() {
     // Reset podstawowych pól
     const typNotatki = document.getElementById('typ_notatki');
     const nrRej = document.getElementById('nr_rejestracyjny');
-    const noteTresc = document.getElementById('noteTresc');
+    const quickNoteTresc = document.getElementById('quickNoteTresc');
+    const vehicleNoteTresc = document.getElementById('vehicleNoteTresc');
     const customCostNumber = document.getElementById('customCostNumber');
     const customCostDescription = document.getElementById('customCostDescription');
     
     if (typNotatki) typNotatki.value = '';
     if (nrRej) nrRej.value = '';
-    if (noteTresc) noteTresc.value = '';
+    if (quickNoteTresc) quickNoteTresc.value = '';
+    if (vehicleNoteTresc) vehicleNoteTresc.value = '';
     if (customCostNumber) customCostNumber.value = '';
     if (customCostDescription) customCostDescription.value = '';
     
     // Ukryj wszystkie sekcje
     hideSection('vehicleSection');
     hideSection('integraSection');
-    hideSection('noteContentSection');
+    hideSection('quickContentSection');
+    hideSection('vehicleContentSection');
+    hideSection('attachmentsRemindersSection');
     hideSection('actionButtons');
     
     // Reset ukrytych pól
@@ -656,6 +671,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
         form.addEventListener('submit', async function(e) {
             e.preventDefault(); // Zatrzymaj normalne wysłanie formularza
+            
+            // Skopiuj treść z odpowiedniego pola do głównego pola "tresc"
+            const typNotatki = document.getElementById('typ_notatki').value;
+            const quickTresc = document.getElementById('quickNoteTresc');
+            const vehicleTresc = document.getElementById('vehicleNoteTresc');
+            
+            // Utwórz ukryte pole "tresc" jeśli nie istnieje
+            let mainTrescField = document.querySelector('input[name="tresc"], textarea[name="tresc"]');
+            if (!mainTrescField) {
+                mainTrescField = document.createElement('input');
+                mainTrescField.type = 'hidden';
+                mainTrescField.name = 'tresc';
+                form.appendChild(mainTrescField);
+            }
+            
+            // Skopiuj odpowiednią treść
+            if (typNotatki === 'szybka' && quickTresc) {
+                mainTrescField.value = quickTresc.value;
+            } else if (typNotatki === 'pojazd' && vehicleTresc) {
+                mainTrescField.value = vehicleTresc.value;
+            }
             
             // Przygotuj dane własnego kosztorysu jeśli został utworzony
             if (window.selectedTowary.length > 0 || window.selectedUslugi.length > 0) {
